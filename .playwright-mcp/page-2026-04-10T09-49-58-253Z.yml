@@ -1,0 +1,43 @@
+- generic [ref=e2]:
+  - generic [ref=e7]:
+    - button "keyboard_double_arrow_left" [ref=e158] [cursor=pointer]:
+      - generic [ref=e160]: keyboard_double_arrow_left
+    - generic [ref=e11]:
+      - heading "导航" [level=1] [ref=e15]
+      - generic [ref=e17]:
+        - paragraph [ref=e20]: 选择功能
+        - radiogroup "选择功能" [ref=e21] [cursor=pointer]:
+          - generic [ref=e22]:
+            - radio "数据源管理"
+            - paragraph [ref=e27]: 数据源管理
+          - generic [ref=e28]:
+            - radio "模板管理"
+            - paragraph [ref=e33]: 模板管理
+          - generic [ref=e34]:
+            - radio "映射配置"
+            - paragraph [ref=e39]: 映射配置
+          - generic [ref=e40]:
+            - radio "执行迁移" [checked] [active]
+            - paragraph [ref=e45]: 执行迁移
+      - separator [ref=e49]
+      - paragraph [ref=e53]:
+        - strong [ref=e54]: Excel 数据迁移工具 v1.0
+  - generic [ref=e3]:
+    - banner [ref=e57]:
+      - generic [ref=e60]:
+        - button "Deploy" [ref=e62] [cursor=pointer]:
+          - generic [ref=e64]: Deploy
+        - button [ref=e66] [cursor=pointer]:
+          - img [ref=e67]
+    - generic [ref=e70]:
+      - heading "执行迁移" [level=2] [ref=e226]: 执行迁移
+      - heading "选择数据源" [level=3] [ref=e231]: 选择数据源
+      - generic [ref=e234]:
+        - paragraph [ref=e237]: 数据源
+        - generic [ref=e239]:
+          - generic [ref=e240]:
+            - generic [ref=e241]: 测试数据源
+            - combobox "Selected 测试数据源. 数据源" [ref=e243]
+          - img "open" [ref=e245]
+      - alert [ref=e248]:
+        - paragraph [ref=e253]: "⚠️ 数据源文件不存在: E:/test/datasource.xlsx"

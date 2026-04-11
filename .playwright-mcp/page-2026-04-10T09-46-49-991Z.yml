@@ -1,0 +1,50 @@
+- generic [ref=e2]:
+  - generic [ref=e11]:
+    - heading "导航" [level=1] [ref=e15]
+    - generic [ref=e17]:
+      - paragraph [ref=e20]: 选择功能
+      - radiogroup "选择功能" [ref=e21] [cursor=pointer]:
+        - generic [ref=e22]:
+          - radio "数据源管理"
+          - paragraph [ref=e27]: 数据源管理
+        - generic [ref=e28]:
+          - radio "模板管理" [checked] [active]
+          - paragraph [ref=e33]: 模板管理
+        - generic [ref=e34]:
+          - radio "映射配置"
+          - paragraph [ref=e39]: 映射配置
+        - generic [ref=e40]:
+          - radio "执行迁移"
+          - paragraph [ref=e45]: 执行迁移
+    - separator [ref=e49]
+    - paragraph [ref=e53]:
+      - strong [ref=e54]: Excel 数据迁移工具 v1.0
+  - generic [ref=e3]:
+    - banner [ref=e57]:
+      - generic [ref=e60]:
+        - button "Deploy" [ref=e62] [cursor=pointer]:
+          - generic [ref=e64]: Deploy
+        - button [ref=e66] [cursor=pointer]:
+          - img [ref=e67]
+    - generic [ref=e70]:
+      - heading "模板管理" [level=2] [ref=e130]: 模板管理
+      - alert [ref=e79]:
+        - paragraph [ref=e84]: 📤 上传 模板（文件会被复制到临时目录）
+      - generic [ref=e133]:
+        - generic [ref=e134]:
+          - paragraph [ref=e136]: 选择 模板 文件
+          - img [ref=e140]
+        - region "选择 模板 文件" [ref=e143] [cursor=pointer]:
+          - button "Choose File" [ref=e144]
+          - generic [ref=e145]:
+            - img [ref=e147]
+            - generic [ref=e150]:
+              - generic [ref=e151]: Drag and drop file here
+              - generic [ref=e152]: Limit 200MB per file • XLSX, XLSM
+          - button "Browse files" [ref=e154]
+      - heading "已保存的模板 (1 个)" [level=3] [ref=e155]: 已保存的模板 (1 个)
+      - group [ref=e117]:
+        - generic "keyboard_arrow_right 📄 测试模板" [ref=e156] [cursor=pointer]:
+          - generic [ref=e119]:
+            - generic [ref=e121]: keyboard_arrow_right
+            - paragraph [ref=e124]: 📄 测试模板

@@ -1,0 +1,64 @@
+- generic [ref=e2]:
+  - generic [ref=e33]:
+    - heading "导航" [level=1] [ref=e37]
+    - generic [ref=e39]:
+      - paragraph [ref=e42]: 选择功能
+      - radiogroup "选择功能" [ref=e43] [cursor=pointer]:
+        - generic [ref=e44]:
+          - radio "数据源管理" [checked]
+          - paragraph [ref=e49]: 数据源管理
+        - generic [ref=e50]:
+          - radio "模板管理"
+          - paragraph [ref=e55]: 模板管理
+        - generic [ref=e56]:
+          - radio "映射配置"
+          - paragraph [ref=e61]: 映射配置
+        - generic [ref=e62]:
+          - radio "执行迁移"
+          - paragraph [ref=e67]: 执行迁移
+    - separator [ref=e71]
+    - paragraph [ref=e75]:
+      - strong [ref=e76]: Excel 数据迁移工具 v1.0
+  - generic [ref=e3]:
+    - banner [ref=e6]:
+      - generic [ref=e9]:
+        - button "Deploy" [ref=e20] [cursor=pointer]:
+          - generic [ref=e22]: Deploy
+        - button [ref=e24] [cursor=pointer]:
+          - img [ref=e25]
+    - generic [ref=e79]:
+      - heading "数据源管理" [level=2] [ref=e84]: 数据源管理
+      - alert [ref=e88]:
+        - paragraph [ref=e93]: 📤 上传 数据源（文件会被复制到临时目录）
+      - generic [ref=e96]:
+        - generic [ref=e97]:
+          - paragraph [ref=e99]: 选择 数据源 文件
+          - img [ref=e103]
+        - region "选择 数据源 文件" [ref=e106] [cursor=pointer]:
+          - button "Choose File" [ref=e107]
+          - generic [ref=e108]:
+            - img [ref=e110]
+            - generic [ref=e113]:
+              - generic [ref=e114]: Drag and drop file here
+              - generic [ref=e115]: Limit 200MB per file • XLSX, XLSM
+          - button "Browse files" [ref=e117]
+      - heading "已保存的数据源 (1 个)" [level=3] [ref=e122]: 已保存的数据源 (1 个)
+      - group [ref=e126]:
+        - generic "keyboard_arrow_down 📄 测试数据源" [active] [ref=e134] [cursor=pointer]:
+          - generic [ref=e128]:
+            - generic [ref=e136]: keyboard_arrow_down
+            - paragraph [ref=e133]: 📄 测试数据源
+        - generic [ref=e138]:
+          - paragraph [ref=e142]:
+            - strong [ref=e143]: "路径:"
+            - code [ref=e144]: E:/test/datasource.xlsx
+          - paragraph [ref=e148]:
+            - strong [ref=e149]: "Sheet数量:"
+            - text: "2"
+          - alert [ref=e152]:
+            - paragraph [ref=e157]: ⚠️ 文件不存在，请重新上传
+          - generic [ref=e159]:
+            - button "🔄 更新" [ref=e164] [cursor=pointer]:
+              - paragraph [ref=e166]: 🔄 更新
+            - button "🗑️ 删除" [ref=e171] [cursor=pointer]:
+              - paragraph [ref=e173]: 🗑️ 删除

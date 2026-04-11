@@ -1,0 +1,17 @@
+{
+  "version": "1.0",
+  "default_direction": "horizontal",
+  "default_write_mode": "skip_nonempty",
+  "sheet_mappings": [
+    {
+      "data_source_sheet": "数据源Sheet名称",
+      "template_file": "模板文件名.xlsx",
+      "copy_rule": {
+        "source_start": "A1",
+        "target_start": "B3",
+        "direction": "horizontal",
+        "length": 12
+      }
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+- generic [ref=e2]:
+  - generic [ref=e7]:
+    - button "keyboard_double_arrow_left" [ref=e158] [cursor=pointer]:
+      - generic [ref=e160]: keyboard_double_arrow_left
+    - generic [ref=e11]:
+      - heading "导航" [level=1] [ref=e15]
+      - generic [ref=e17]:
+        - paragraph [ref=e20]: 选择功能
+        - radiogroup "选择功能" [ref=e21] [cursor=pointer]:
+          - generic [ref=e22]:
+            - radio "数据源管理"
+            - paragraph [ref=e27]: 数据源管理
+          - generic [ref=e28]:
+            - radio "模板管理"
+            - paragraph [ref=e33]: 模板管理
+          - generic [ref=e34]:
+            - radio "映射配置" [checked] [active]
+            - paragraph [ref=e39]: 映射配置
+          - generic [ref=e40]:
+            - radio "执行迁移"
+            - paragraph [ref=e45]: 执行迁移
+      - separator [ref=e49]
+      - paragraph [ref=e53]:
+        - strong [ref=e54]: Excel 数据迁移工具 v1.0
+  - generic [ref=e3]:
+    - banner [ref=e57]:
+      - generic [ref=e60]:
+        - button "Deploy" [ref=e62] [cursor=pointer]:
+          - generic [ref=e64]: Deploy
+        - button [ref=e66] [cursor=pointer]:
+          - img [ref=e67]
+    - generic [ref=e70]:
+      - heading "映射配置" [level=2] [ref=e161]: 映射配置
+      - button "📥 下载示例文件" [ref=e168] [cursor=pointer]:
+        - paragraph [ref=e170]: 📥 下载示例文件
+      - alert [ref=e175]:
+        - paragraph [ref=e180]:
+          - text: 请下载示例文件，填写完成后上传导入。示例文件名：
+          - strong [ref=e181]: "[示例]映射配置.json"
+      - separator [ref=e184]
+      - group [ref=e117]:
+        - generic "keyboard_arrow_down 导入映射配置" [ref=e185] [cursor=pointer]:
+          - generic [ref=e119]:
+            - generic [ref=e187]: keyboard_arrow_down
+            - paragraph [ref=e124]: 导入映射配置
+        - generic [ref=e192]:
+          - paragraph [ref=e195]: 选择 JSON 映射配置文件
+          - region "选择 JSON 映射配置文件" [ref=e196] [cursor=pointer]:
+            - button "Choose File" [ref=e197]
+            - generic [ref=e198]:
+              - img [ref=e200]
+              - generic [ref=e203]:
+                - generic [ref=e204]: Drag and drop file here
+                - generic [ref=e205]: Limit 200MB per file • JSON
+            - button "Browse files" [ref=e207]
+      - separator [ref=e211]
+      - heading "已有映射配置" [level=3] [ref=e216]: 已有映射配置
+      - alert [ref=e220]:
+        - paragraph [ref=e225]: 暂无已保存的映射配置
