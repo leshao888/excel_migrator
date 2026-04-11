@@ -408,13 +408,7 @@ class ExcelMigratorApp:
         content_frame = ttk.Frame(frame)
         content_frame.pack(fill=BOTH, expand=True, pady=10)
 
-        # 左侧：列表
-        left_frame = ttk.LabelFrame(content_frame, text="已有映射配置")
-        left_frame.pack(side=LEFT, fill=BOTH, expand=True, padx=(0, 5))
-
-        self._refresh_mapping_list(left_frame)
-
-        # 右侧：详情预览
+        # 右侧：详情预览（先创建，因为刷新列表时会用到）
         right_frame = ttk.LabelFrame(content_frame, text="映射详情预览")
         right_frame.pack(side=RIGHT, fill=BOTH, expand=True, padx=(5, 0))
 
@@ -431,6 +425,12 @@ class ExcelMigratorApp:
 
         ttk.Button(edit_btn_frame, text="🗑️ 删除选中配置", bootstyle="danger",
                    command=self._delete_selected_mapping).pack(side=LEFT, padx=5)
+
+        # 左侧：列表
+        left_frame = ttk.LabelFrame(content_frame, text="已有映射配置")
+        left_frame.pack(side=LEFT, fill=BOTH, expand=True, padx=(0, 5))
+
+        self._refresh_mapping_list(left_frame)
 
         return frame
 
