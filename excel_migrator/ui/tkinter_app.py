@@ -150,9 +150,6 @@ class ExcelMigratorApp:
         # 标题
         ttk.Label(frame, text="数据源管理", font=("Microsoft YaHei", 16, "bold")).pack(anchor=W, pady=10)
 
-        # 配置路径提示
-        ttk.Label(frame, text=f"📁 配置文件: {DATA_SOURCES_FILE}", bootstyle="success").pack(anchor=W, pady=5)
-
         # 上传区域
         upload_frame = ttk.LabelFrame(frame, text="上传数据源")
         upload_frame.pack(fill=X, pady=10)
@@ -331,7 +328,6 @@ class ExcelMigratorApp:
         frame = ttk.Frame(self.root)
 
         ttk.Label(frame, text="模板管理", font=("Microsoft YaHei", 16, "bold")).pack(anchor=W, pady=10)
-        ttk.Label(frame, text=f"📁 配置文件: {TEMPLATES_FILE}", bootstyle="success").pack(anchor=W, pady=5)
 
         upload_frame = ttk.LabelFrame(frame, text="上传模板")
         upload_frame.pack(fill=X, pady=10)
@@ -525,23 +521,42 @@ class ExcelMigratorApp:
         import_frame = ttk.LabelFrame(frame, text="导入映射配置")
         import_frame.pack(fill=X, pady=10)
 
-        config_path_var = tk.StringVar()
-        config_name_var = tk.StringVar()
+        def do_import_action():
+            path = filedialog.askopenfilename(title="选择映射配置文件", filetypes=[("JSON 文件", "*.json")])
+            if not path:
+                return
 
-        def select_config():
-            path = filedialog.askopenfilename(
-                title="选择映射配置文件",
-                filetypes=[("JSON 文件", "*.json")]
-            )
-            if path:
-                config_path_var.set(path)
-                config_name_var.set(os.path.basename(path).replace(".json", ""))
+            # 弹出名称输入对话框
+            dialog = tk.Toplevel(self.root)
+            dialog.title("导入映射配置")
+            dialog.geometry("300x100")
+            dialog.transient(self.root)
+            dialog.grab_set()
 
-        ttk.Button(import_frame, text="📤 选择JSON文件", command=select_config).pack(side=LEFT)
-        ttk.Entry(import_frame, textvariable=config_path_var, width=40).pack(side=LEFT, padx=10)
-        ttk.Label(import_frame, text="配置名称:").pack(side=LEFT)
-        ttk.Entry(import_frame, textvariable=config_name_var, width=20).pack(side=LEFT, padx=10)
-        ttk.Button(import_frame, text="💾 保存", bootstyle="success", command=self._import_mapping_config).pack(side=LEFT, padx=10)
+            ttk.Label(dialog, text="配置名称:").pack(pady=5)
+            name_var = tk.StringVar(value=os.path.basename(path).replace(".json", ""))
+            ttk.Entry(dialog, textvariable=name_var, width=30).pack(pady=5)
+
+            def final_import():
+                config_name = name_var.get().strip()
+                if not config_name:
+                    messagebox.showerror("错误", "请输入配置名称")
+                    return
+                try:
+                    with open(path, "r", encoding="utf-8") as f:
+                        config_data = json.load(f)
+                    config = MappingConfig.from_dict(config_data)
+                    item = MappingConfigItem.create(name=config_name, config=config)
+                    self.store.save_mapping_config(item)
+                    messagebox.showinfo("成功", f"映射配置 '{config_name}' 保存成功")
+                    dialog.destroy()
+                    self._refresh_mapping_list(list_frame)
+                except json.JSONDecodeError as e:
+                    messagebox.showerror("错误", f"JSON 格式错误: {str(e)}")
+                except Exception as e:
+                    messagebox.showerror("错误", f"导入失败: {str(e)}")
+
+            ttk.Button(dialog, text="确定", command=final_import).pack(pady=10)
 
         # 已有配置
         list_frame = ttk.LabelFrame(frame, text="已有映射配置")
@@ -550,49 +565,6 @@ class ExcelMigratorApp:
         self._refresh_mapping_list(list_frame)
 
         return frame
-
-    def _import_mapping_config(self):
-        config_path = None  # 获取导入文件路径
-        name = None
-
-        # 弹出文件选择
-        path = filedialog.askopenfilename(title="选择映射配置文件", filetypes=[("JSON 文件", "*.json")])
-        if not path:
-            return
-
-        # 弹出名称输入对话框
-        dialog = tk.Toplevel(self.root)
-        dialog.title("导入映射配置")
-        dialog.geometry("300x100")
-        dialog.transient(self.root)
-        dialog.grab_set()
-
-        ttk.Label(dialog, text="配置名称:").pack(pady=5)
-        name_var = tk.StringVar(value=os.path.basename(path).replace(".json", ""))
-        ttk.Entry(dialog, textvariable=name_var, width=30).pack(pady=5)
-
-        def do_import():
-            config_name = name_var.get().strip()
-            if not config_name:
-                messagebox.showerror("错误", "请输入配置名称")
-                return
-
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    config_data = json.load(f)
-
-                config = MappingConfig.from_dict(config_data)
-                item = MappingConfigItem.create(name=config_name, config=config)
-                self.store.save_mapping_config(item)
-                messagebox.showinfo("成功", f"映射配置 '{config_name}' 保存成功")
-                dialog.destroy()
-
-            except json.JSONDecodeError as e:
-                messagebox.showerror("错误", f"JSON 格式错误: {str(e)}")
-            except Exception as e:
-                messagebox.showerror("错误", f"导入失败: {str(e)}")
-
-        ttk.Button(dialog, text="确定", command=do_import).pack(pady=10)
 
     def _refresh_mapping_list(self, parent_frame):
         for widget in parent_frame.winfo_children():
@@ -604,30 +576,66 @@ class ExcelMigratorApp:
             ttk.Label(parent_frame, text="暂无已保存的映射配置", bootstyle="info").pack()
             return
 
-        # 下拉选择
-        select_frame = ttk.Frame(parent_frame)
-        select_frame.pack(fill=X, pady=5)
+        # 创建表格
+        columns = ("name", "mappings", "created")
+        tree = ttk.Treeview(parent_frame, columns=columns, show="headings", height=10)
 
-        ttk.Label(select_frame, text="选择映射配置:").pack(side=LEFT)
-        selected_id = [None]
-        combo = ttk.Combobox(select_frame, values=[c.name for c in configs], state="readonly", width=30)
-        combo.current(0)
-        combo.pack(side=LEFT, padx=10)
-        selected_id[0] = configs[0].id
+        tree.heading("name", text="配置名称")
+        tree.heading("mappings", text="映射数量")
+        tree.heading("created", text="创建时间")
 
-        def on_select(event):
-            idx = combo.current()
-            selected_id[0] = configs[idx].id
-            self._show_mapping_detail(detail_frame, configs[idx])
+        tree.column("name", width=200)
+        tree.column("mappings", width=100, anchor=CENTER)
+        tree.column("created", width=150)
 
-        combo.bind("<<ComboboxSelected>>", on_select)
+        for c in configs:
+            tree.insert("", END, values=(c.name, len(c.config.sheet_mappings), c.created_at[:10]), tags=(c.id,))
+
+        tree.pack(fill=BOTH, expand=True)
 
         # 详情区域
         detail_frame = ttk.Frame(parent_frame)
         detail_frame.pack(fill=BOTH, expand=True, pady=10)
 
+        def on_select(event):
+            selected = tree.selection()
+            if selected:
+                config_id = tree.item(selected[0])["tags"][0]
+                config_item = self.store.get_mapping_config(config_id)
+                if config_item:
+                    self._show_mapping_detail(detail_frame, config_item)
+
+        tree.bind("<<TreeviewSelect>>", on_select)
+
+        # 按钮
+        btn_frame = ttk.Frame(parent_frame)
+        btn_frame.pack(fill=X, pady=5)
+
+        def on_edit():
+            selected = tree.selection()
+            if selected:
+                config_id = tree.item(selected[0])["tags"][0]
+                config_item = self.store.get_mapping_config(config_id)
+                if config_item:
+                    self._edit_mapping_config(config_item)
+
+        def on_delete():
+            selected = tree.selection()
+            if selected:
+                config_id = tree.item(selected[0])["tags"][0]
+                if messagebox.askyesno("确认", "确定要删除这个映射配置吗？"):
+                    self.store.delete_mapping_config(config_id)
+                    self._refresh_mapping_list(parent_frame)
+
+        ttk.Button(btn_frame, text="✏️ 修改", command=on_edit).pack(side=LEFT, padx=5)
+        ttk.Button(btn_frame, text="🗑️ 删除", bootstyle="danger", command=on_delete).pack(side=LEFT)
+
+        # 默认显示第一个的详情
         if configs:
-            self._show_mapping_detail(detail_frame, configs[0])
+            tree.selection_set(tree.get_children()[0])
+            config_item = self.store.get_mapping_config(tree.item(tree.get_children()[0])["tags"][0])
+            if config_item:
+                self._show_mapping_detail(detail_frame, config_item)
 
     def _show_mapping_detail(self, parent_frame, config_item):
         for widget in parent_frame.winfo_children():
@@ -641,7 +649,6 @@ class ExcelMigratorApp:
         for i, mapping in enumerate(config_item.config.sheet_mappings):
             rule = mapping.copy_rule
             if rule.is_array_mode():
-                pairs = rule.get_pairs()
                 text = f"{i+1}. {mapping.data_source_sheet} → {mapping.template_file} ({rule.direction.value}, {rule.length}格)"
             else:
                 text = f"{i+1}. {mapping.data_source_sheet} → {mapping.template_file} ({rule.source_start} → {rule.target_start}, {rule.direction.value}, {rule.length}格)"
@@ -655,13 +662,6 @@ class ExcelMigratorApp:
         json_text.pack(fill=BOTH, expand=True)
         json_text.insert("1.0", json.dumps(config_item.config.to_dict(), ensure_ascii=False, indent=2))
         json_text.config(state="disabled")
-
-        # 按钮
-        btn_frame = ttk.Frame(parent_frame)
-        btn_frame.pack(fill=X, pady=10)
-
-        ttk.Button(btn_frame, text="✏️ 修改", command=lambda: self._edit_mapping_config(config_item)).pack(side=LEFT, padx=5)
-        ttk.Button(btn_frame, text="🗑️ 删除", bootstyle="danger", command=lambda: self._delete_mapping_config(config_item.id)).pack(side=LEFT)
 
     def _edit_mapping_config(self, config_item):
         """编辑映射配置"""
@@ -823,8 +823,8 @@ class ExcelMigratorApp:
         ds_frame = ttk.LabelFrame(frame, text="选择数据源")
         ds_frame.pack(fill=X, pady=10)
 
-        ds_var = tk.StringVar(value=data_sources[0].id)
-        ds_combo = ttk.Combobox(ds_frame, values=[(ds.id, ds.name) for ds in data_sources],
+        ds_var = tk.StringVar(value=data_sources[0].name)
+        ds_combo = ttk.Combobox(ds_frame, values=[ds.name for ds in data_sources],
                                 textvariable=ds_var, state="readonly", width=30)
         ds_combo.pack(side=LEFT)
 
@@ -832,8 +832,8 @@ class ExcelMigratorApp:
         t_frame = ttk.LabelFrame(frame, text="选择模板（将被修改）")
         t_frame.pack(fill=X, pady=10)
 
-        t_var = tk.StringVar(value=templates[0].id)
-        t_combo = ttk.Combobox(t_frame, values=[(t.id, t.name) for t in templates],
+        t_var = tk.StringVar(value=templates[0].name)
+        t_combo = ttk.Combobox(t_frame, values=[t.name for t in templates],
                                textvariable=t_var, state="readonly", width=30)
         t_combo.pack(side=LEFT)
 
@@ -841,8 +841,8 @@ class ExcelMigratorApp:
         config_frame = ttk.LabelFrame(frame, text="选择映射配置")
         config_frame.pack(fill=X, pady=10)
 
-        config_var = tk.StringVar(value=configs[0].id)
-        config_combo = ttk.Combobox(config_frame, values=[(c.id, c.name) for c in configs],
+        config_var = tk.StringVar(value=configs[0].name)
+        config_combo = ttk.Combobox(config_frame, values=[c.name for c in configs],
                                     textvariable=config_var, state="readonly", width=30)
         config_combo.pack(side=LEFT)
 
@@ -857,11 +857,12 @@ class ExcelMigratorApp:
             preview_text.config(state="normal")
             preview_text.delete("1.0", END)
 
-            ds_id = ds_var.get()
-            config_id = config_var.get()
+            ds_name = ds_var.get()
+            config_name = config_var.get()
 
-            ds = self.store.get_data_source(ds_id)
-            config_item = self.store.get_mapping_config(config_id)
+            # 根据名称查找
+            ds = next((d for d in data_sources if d.name == ds_name), None)
+            config_item = next((c for c in configs if c.name == config_name), None)
 
             if not ds or not config_item:
                 preview_text.insert("1.0", "请选择数据源和映射配置")
@@ -917,13 +918,13 @@ class ExcelMigratorApp:
             result_text.delete("1.0", END)
             result_text.update()
 
-            ds_id = ds_var.get()
-            t_id = t_var.get()
-            config_id = config_var.get()
+            ds_name = ds_var.get()
+            t_name = t_var.get()
+            config_name = config_var.get()
 
-            ds = self.store.get_data_source(ds_id)
-            t_item = self.store.get_template(t_id)
-            config_item = self.store.get_mapping_config(config_id)
+            ds = next((d for d in data_sources if d.name == ds_name), None)
+            t_item = next((t for t in templates if t.name == t_name), None)
+            config_item = next((c for c in configs if c.name == config_name), None)
 
             if not all([ds, t_item, config_item]):
                 result_text.insert("1.0", "请确保已选择数据源、模板和映射配置")
