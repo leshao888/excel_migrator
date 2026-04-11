@@ -154,7 +154,7 @@ class ExcelMigratorApp:
         ttk.Label(frame, text=f"📁 配置文件: {DATA_SOURCES_FILE}", bootstyle="success").pack(anchor=W, pady=5)
 
         # 上传区域
-        upload_frame = ttk.LabelFrame(frame, text="上传数据源", padding=10)
+        upload_frame = ttk.LabelFrame(frame, text="上传数据源")
         upload_frame.pack(fill=X, pady=10)
 
         file_path_var = tk.StringVar()
@@ -186,7 +186,7 @@ class ExcelMigratorApp:
         save_btn.pack(side=LEFT, padx=5)
 
         # 数据源列表
-        ds_list_frame = ttk.LabelFrame(frame, text="已保存的数据源", padding=10)
+        ds_list_frame = ttk.LabelFrame(frame, text="已保存的数据源")
         ds_list_frame.pack(fill=BOTH, expand=True, pady=10)
 
         self._refresh_datasource_list(ds_list_frame)
@@ -333,7 +333,7 @@ class ExcelMigratorApp:
         ttk.Label(frame, text="模板管理", font=("Microsoft YaHei", 16, "bold")).pack(anchor=W, pady=10)
         ttk.Label(frame, text=f"📁 配置文件: {TEMPLATES_FILE}", bootstyle="success").pack(anchor=W, pady=5)
 
-        upload_frame = ttk.LabelFrame(frame, text="上传模板", padding=10)
+        upload_frame = ttk.LabelFrame(frame, text="上传模板")
         upload_frame.pack(fill=X, pady=10)
 
         file_path_var = tk.StringVar()
@@ -361,7 +361,7 @@ class ExcelMigratorApp:
         btn_frame.pack(fill=X, pady=10)
         ttk.Button(btn_frame, text="💾 保存", bootstyle="success", command=lambda: self._save_template(file_path_var.get(), file_name_var.get(), tmpl_list_frame)).pack(side=LEFT, padx=5)
 
-        tmpl_list_frame = ttk.LabelFrame(frame, text="已保存的模板", padding=10)
+        tmpl_list_frame = ttk.LabelFrame(frame, text="已保存的模板")
         tmpl_list_frame.pack(fill=BOTH, expand=True, pady=10)
 
         self._refresh_template_list(tmpl_list_frame)
@@ -522,7 +522,7 @@ class ExcelMigratorApp:
         ttk.Label(example_frame, text=f"请下载示例文件，填写完成后上传导入。示例文件名：{EXAMPLE_MAPPING_FILENAME}", bootstyle="info").pack(side=LEFT, padx=10)
 
         # 导入新配置
-        import_frame = ttk.LabelFrame(frame, text="导入映射配置", padding=10)
+        import_frame = ttk.LabelFrame(frame, text="导入映射配置")
         import_frame.pack(fill=X, pady=10)
 
         config_path_var = tk.StringVar()
@@ -544,7 +544,7 @@ class ExcelMigratorApp:
         ttk.Button(import_frame, text="💾 保存", bootstyle="success", command=self._import_mapping_config).pack(side=LEFT, padx=10)
 
         # 已有配置
-        list_frame = ttk.LabelFrame(frame, text="已有映射配置", padding=10)
+        list_frame = ttk.LabelFrame(frame, text="已有映射配置")
         list_frame.pack(fill=BOTH, expand=True, pady=10)
 
         self._refresh_mapping_list(list_frame)
@@ -648,7 +648,7 @@ class ExcelMigratorApp:
             ttk.Label(parent_frame, text=text).pack(anchor=W, padx=20)
 
         # JSON 预览
-        json_frame = ttk.LabelFrame(parent_frame, text="JSON 配置预览", padding=5)
+        json_frame = ttk.LabelFrame(parent_frame, text="JSON 配置预览")
         json_frame.pack(fill=BOTH, expand=True, pady=10)
 
         json_text = scrolledtext.ScrolledText(json_frame, height=10, font=("Consolas", 9))
@@ -701,7 +701,7 @@ class ExcelMigratorApp:
 
         # 解析现有映射
         for i, mapping in enumerate(config_item.config.sheet_mappings):
-            mapping_frame = ttk.LabelFrame(scrollable_frame, text=f"映射 {i+1}", padding=5)
+            mapping_frame = ttk.LabelFrame(scrollable_frame, text=f"映射 {i+1}")
             mapping_frame.pack(fill=X, pady=5, padx=5)
 
             mv = {
@@ -820,7 +820,7 @@ class ExcelMigratorApp:
             return frame
 
         # 选择数据源
-        ds_frame = ttk.LabelFrame(frame, text="选择数据源", padding=10)
+        ds_frame = ttk.LabelFrame(frame, text="选择数据源")
         ds_frame.pack(fill=X, pady=10)
 
         ds_var = tk.StringVar(value=data_sources[0].id)
@@ -829,7 +829,7 @@ class ExcelMigratorApp:
         ds_combo.pack(side=LEFT)
 
         # 选择模板
-        t_frame = ttk.LabelFrame(frame, text="选择模板（将被修改）", padding=10)
+        t_frame = ttk.LabelFrame(frame, text="选择模板（将被修改）")
         t_frame.pack(fill=X, pady=10)
 
         t_var = tk.StringVar(value=templates[0].id)
@@ -838,7 +838,7 @@ class ExcelMigratorApp:
         t_combo.pack(side=LEFT)
 
         # 选择映射配置
-        config_frame = ttk.LabelFrame(frame, text="选择映射配置", padding=10)
+        config_frame = ttk.LabelFrame(frame, text="选择映射配置")
         config_frame.pack(fill=X, pady=10)
 
         config_var = tk.StringVar(value=configs[0].id)
@@ -847,7 +847,7 @@ class ExcelMigratorApp:
         config_combo.pack(side=LEFT)
 
         # 映射预览
-        preview_frame = ttk.LabelFrame(frame, text="映射预览", padding=10)
+        preview_frame = ttk.LabelFrame(frame, text="映射预览")
         preview_frame.pack(fill=BOTH, expand=True, pady=10)
 
         preview_text = scrolledtext.ScrolledText(preview_frame, height=15, font=("Consolas", 9))
