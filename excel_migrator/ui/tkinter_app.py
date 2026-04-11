@@ -565,27 +565,32 @@ class ExcelMigratorApp:
 
     def _edit_selected_mapping(self):
         """编辑选中的映射配置"""
-        list_frame = self._find_list_frame("mapping")
-        if not list_frame:
+        configs = self.store.load_mapping_configs()
+        if not configs:
+            messagebox.showwarning("提示", "暂无映射配置可编辑")
             return
 
-        # 找到treeview
-        tree = None
-        for widget in list_frame.winfo_children():
-            if isinstance(widget, ttk.Treeview):
-                tree = widget
-                break
+        # 弹出选择对话框
+        dialog = tk.Toplevel(self.root)
+        dialog.title("选择要编辑的配置")
+        dialog.geometry("400x120")
+        dialog.transient(self.root)
+        dialog.grab_set()
 
-        if not tree or not tree.selection():
-            messagebox.showwarning("提示", "请先选择一个映射配置")
-            return
+        ttk.Label(dialog, text="选择映射配置:").pack(pady=10)
 
-        config_id = tree.item(tree.selection()[0])["tags"][0]
-        config_item = self.store.get_mapping_config(config_id)
-        if not config_item:
-            return
+        selected_config = [None]
+        combo = ttk.Combobox(dialog, values=[c.name for c in configs], state="readonly", width=40)
+        combo.current(0)
+        combo.pack(pady=10)
 
-        self._open_mapping_editor(config_item)
+        def do_edit():
+            idx = combo.current()
+            if idx >= 0 and idx < len(configs):
+                dialog.destroy()
+                self._open_mapping_editor(configs[idx])
+
+        ttk.Button(dialog, text="编辑", bootstyle="primary", command=do_edit).pack(pady=5)
 
     def _open_mapping_editor(self, config_item):
         """打开映射配置编辑器"""
@@ -629,7 +634,7 @@ class ExcelMigratorApp:
         templates = self.store.load_templates()
 
         for i, mapping in enumerate(config_item.config.sheet_mappings):
-            mf = ttk.LabelFrame(scrollable, text=f"映射 {i+1}", padding=5)
+            mf = ttk.LabelFrame(scrollable, text=f"映射 {i+1}")
             mf.pack(fill=X, pady=3, padx=5)
 
             mv = {"index": i}
