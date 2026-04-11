@@ -436,6 +436,7 @@ class ExcelMigratorApp:
             return
 
         success_count = 0
+        overwrite_count = 0
         for path in paths:
             if not path:
                 continue
@@ -446,16 +447,38 @@ class ExcelMigratorApp:
 
                 config = MappingConfig.from_dict(config_data)
                 name = os.path.basename(path).replace(".json", "")
-                item = MappingConfigItem.create(name=name, config=config)
-                self.store.save_mapping_config(item)
-                success_count += 1
+
+                # 检查是否已存在同名配置
+                existing_configs = self.store.load_mapping_configs()
+                existing = next((c for c in existing_configs if c.name == name), None)
+
+                if existing:
+                    # 覆盖更新，保留原 id 和创建时间
+                    item = MappingConfigItem(
+                        id=existing.id,
+                        name=name,
+                        config=config,
+                        created_at=existing.created_at,
+                        updated_at=datetime.now().isoformat()
+                    )
+                    self.store.update_mapping_config(item)
+                    overwrite_count += 1
+                else:
+                    # 新建，使用新 id
+                    item = MappingConfigItem.create(name=name, config=config)
+                    self.store.save_mapping_config(item)
+                    success_count += 1
+
             except json.JSONDecodeError as e:
                 messagebox.showerror("错误", f"JSON 格式错误: {path}\n{str(e)}")
             except Exception as e:
                 messagebox.showerror("错误", f"导入失败: {str(e)}")
 
-        if success_count > 0:
-            messagebox.showinfo("成功", f"成功导入 {success_count} 个映射配置")
+        msg = f"成功导入 {success_count} 个"
+        if overwrite_count > 0:
+            msg += f"，覆盖更新 {overwrite_count} 个"
+        if success_count > 0 or overwrite_count > 0:
+            messagebox.showinfo("成功", msg)
             self._refresh_mapping_list(self._find_list_frame("mapping"))
 
     def _refresh_mapping_list(self, parent_frame):
