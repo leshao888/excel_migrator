@@ -31,9 +31,9 @@ class DataCopier:
             source_sheet_name = mapping.data_source_sheet
             # 目标模板文件名称（用于显示）
             template_file = mapping.template_file
-            # 目标 sheet 名称（模板的默认 sheet）
+            # 目标 sheet 名称（优先使用 mapping 中的 template_sheet，否则使用默认的）
             if target_sheet_name is None:
-                target_sheet_name = get_sheet_names(target_wb)[0]  # 使用模板的第一个 sheet
+                target_sheet_name = mapping.template_sheet if mapping.template_sheet else get_sheet_names(target_wb)[0]
 
             if source_sheet_name not in get_sheet_names(source_wb):
                 return CopyResult(

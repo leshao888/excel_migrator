@@ -58,25 +58,40 @@ class SheetMapping:
     """Sheet 映射配置"""
     data_source_sheet: str   # 数据源的 sheet 名称
     template_file: str        # 目标模板文件名称
-    copy_rule: CopyRule
+    template_sheet: str = ""  # 目标模板的 sheet 名称（可选，默认使用第一个）
+    copy_rule: CopyRule = None  # 修复：添加默认值
+
+    def __post_init__(self):
+        if self.copy_rule is None:
+            self.copy_rule = CopyRule(
+                source_start="A1",
+                target_start="A1",
+                direction=Direction.HORIZONTAL,
+                length=10
+            )
 
     @classmethod
     def from_dict(cls, data: dict) -> "SheetMapping":
         # 兼容旧字段名
         source_sheet = data.get("data_source_sheet") or data.get("source_sheet", "")
         target = data.get("template_file") or data.get("target_sheet", "")
+        tmpl_sheet = data.get("template_sheet", "")  # 兼容旧版本
         return cls(
             data_source_sheet=source_sheet,
             template_file=target,
+            template_sheet=tmpl_sheet,
             copy_rule=CopyRule.from_dict(data["copy_rule"])
         )
 
     def to_dict(self) -> dict:
-        return {
+        result = {
             "data_source_sheet": self.data_source_sheet,
             "template_file": self.template_file,
             "copy_rule": self.copy_rule.to_dict()
         }
+        if self.template_sheet:
+            result["template_sheet"] = self.template_sheet
+        return result
 
 
 @dataclass

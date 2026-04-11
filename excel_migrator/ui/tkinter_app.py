@@ -379,6 +379,7 @@ class ExcelMigratorApp:
                     {
                         "data_source_sheet": "数据源Sheet名称",
                         "template_file": "模板文件名.xlsx",
+                        "template_sheet": "模板Sheet名称",
                         "copy_rule": {
                             "source_start": ["A1", "B1", "C1"],
                             "target_start": ["D1", "E1", "F1"],
@@ -560,11 +561,13 @@ class ExcelMigratorApp:
                     ds_name = ds.name
                     break
 
+            # 查找模板sheet
+            tmpl_sheet = mapping.template_sheet if mapping.template_sheet else "默认"
+
             self.detail_text.insert(END, f"【映射 {i+1}】\n")
-            self.detail_text.insert(END, f"  数据源: {ds_name}\n")
-            self.detail_text.insert(END, f"  数据源 Sheet: {mapping.data_source_sheet}\n")
-            self.detail_text.insert(END, f"  → 模板文件: {mapping.template_file}\n")
-            self.detail_text.insert(END, f"  复制规则: {rule.source_start} → {rule.target_start}, {rule.direction.value}, {rule.length}格\n\n")
+            self.detail_text.insert(END, f"  数据源: {ds_name} > {mapping.data_source_sheet}\n")
+            self.detail_text.insert(END, f"  → 模板: {mapping.template_file} > {tmpl_sheet}\n")
+            self.detail_text.insert(END, f"  规则: {rule.source_start} → {rule.target_start}, {rule.direction.value}, {rule.length}格\n\n")
 
         self.detail_text.insert(END, "="*50 + "\n")
         self.detail_text.insert(END, "【完整 JSON 配置】\n")
@@ -633,56 +636,112 @@ class ExcelMigratorApp:
         data_sources = self.store.load_data_sources()
         templates = self.store.load_templates()
 
-        # 构建 "数据源名称 > Sheet" 格式的列表
-        ds_sheet_options = []
-        for ds in data_sources:
-            for sheet in ds.sheets:
-                ds_sheet_options.append(f"{ds.name} > {sheet}")
+        # 找到当前映射对应的数据源
+        def find_ds_by_sheet(sheet_name):
+            for ds in data_sources:
+                if sheet_name in ds.sheets:
+                    return ds
+            return None
+
+        # 找到当前映射对应的模板
+        def find_tmpl_by_file(file_name):
+            for t in templates:
+                if os.path.basename(t.file_path) == file_name:
+                    return t
+            return None
 
         for i, mapping in enumerate(config_item.config.sheet_mappings):
             mf = ttk.LabelFrame(scrollable, text=f"映射 {i+1}")
-            mf.pack(fill=X, pady=3, padx=5)
+            mf.pack(fill=X, pady=5, padx=5)
 
             mv = {"index": i}
 
-            # 找到当前映射对应的数据源sheet选项
-            current_ds_sheet = ""
-            for ds in data_sources:
-                if mapping.data_source_sheet in ds.sheets:
-                    current_ds_sheet = f"{ds.name} > {mapping.data_source_sheet}"
-                    break
+            # 找到当前选中的数据源和模板
+            current_ds = find_ds_by_sheet(mapping.data_source_sheet)
+            current_tmpl = find_tmpl_by_file(mapping.template_file)
 
-            # 数据源 + Sheet
-            ttk.Label(mf, text="数据源 > Sheet:").grid(row=0, column=0, sticky=W, padx=2, pady=2)
-            mv["ds_sheet"] = tk.StringVar(value=current_ds_sheet)
-            ttk.Combobox(mf, values=ds_sheet_options, textvariable=mv["ds_sheet"], width=25, state="readonly").grid(row=0, column=1, sticky=W, padx=2, pady=2)
+            # 行0: 数据源选择
+            ttk.Label(mf, text="数据源:").grid(row=0, column=0, sticky=W, padx=2, pady=2)
+            mv["ds"] = tk.StringVar(value=current_ds.name if current_ds else "")
+            ds_combo = ttk.Combobox(mf, values=[ds.name for ds in data_sources],
+                                    textvariable=mv["ds"], width=20, state="readonly")
+            ds_combo.grid(row=0, column=1, sticky=W, padx=2, pady=2)
 
-            # 模板文件
-            ttk.Label(mf, text="模板文件:").grid(row=0, column=2, sticky=W, padx=2, pady=2)
-            t_files = [os.path.basename(t.file_path) for t in templates] if templates else []
+            # 行0: 数据源Sheet选择
+            ttk.Label(mf, text="Sheet:").grid(row=0, column=2, sticky=W, padx=2, pady=2)
+            mv["ds_sheet"] = tk.StringVar(value=mapping.data_source_sheet)
+            ds_sheet_combo = ttk.Combobox(mf, values=current_ds.sheets if current_ds else [],
+                                           textvariable=mv["ds_sheet"], width=15, state="readonly")
+            ds_sheet_combo.grid(row=0, column=3, sticky=W, padx=2, pady=2)
+
+            # 数据源Sheet下拉根据数据源变化
+            def on_ds_change(event, idx=i):
+                ds_name = mapping_vars[idx]["ds"].get()
+                ds = next((d for d in data_sources if d.name == ds_name), None)
+                if ds:
+                    mapping_vars[idx]["ds_sheet"].set("")
+                    # 找到对应的combobox并更新
+                    for child in scrollable.winfo_children():
+                        if isinstance(child, ttk.LabelFrame):
+                            for widget in child.winfo_children():
+                                if isinstance(widget, ttk.Combobox) and widget == mapping_vars[idx].get("ds_sheet_combo"):
+                                    pass  # will be updated below
+
+            def update_ds_sheets(event, idx=i, combo=ds_sheet_combo):
+                ds_name = mapping_vars[idx]["ds"].get()
+                ds = next((d for d in data_sources if d.name == ds_name), None)
+                if ds:
+                    combo["values"] = ds.sheets
+                    if mapping_vars[idx]["ds_sheet"].get() not in ds.sheets:
+                        mapping_vars[idx]["ds_sheet"].set(ds.sheets[0] if ds.sheets else "")
+
+            ds_combo.bind("<<ComboboxSelected>>", lambda e, idx=i, combo=ds_sheet_combo: update_ds_sheets(e, idx, combo))
+            mv["ds_sheet_combo"] = ds_sheet_combo
+
+            # 行1: 模板文件选择
+            ttk.Label(mf, text="模板文件:").grid(row=1, column=0, sticky=W, padx=2, pady=2)
             mv["template"] = tk.StringVar(value=mapping.template_file)
-            ttk.Combobox(mf, values=t_files, textvariable=mv["template"], width=25, state="readonly").grid(row=0, column=3, sticky=W, padx=2, pady=2)
+            t_combo = ttk.Combobox(mf, values=[os.path.basename(t.file_path) for t in templates],
+                                   textvariable=mv["template"], width=20, state="readonly")
+            t_combo.grid(row=1, column=1, sticky=W, padx=2, pady=2)
 
-            # 源起始
-            ttk.Label(mf, text="源起始:").grid(row=1, column=0, sticky=W, padx=2, pady=2)
+            # 行1: 模板Sheet选择
+            ttk.Label(mf, text="模板Sheet:").grid(row=1, column=2, sticky=W, padx=2, pady=2)
+            mv["template_sheet"] = tk.StringVar(value=mapping.template_sheet)
+            t_sheet_combo = ttk.Combobox(mf, values=current_tmpl.sheets if current_tmpl else [],
+                                         textvariable=mv["template_sheet"], width=15, state="readonly")
+            t_sheet_combo.grid(row=1, column=3, sticky=W, padx=2, pady=2)
+
+            def update_template_sheets(event, idx=i, combo=t_sheet_combo):
+                t_name = mapping_vars[idx]["template"].get()
+                t = find_tmpl_by_file(t_name)
+                if t:
+                    combo["values"] = t.sheets
+                    if mapping_vars[idx]["template_sheet"].get() not in t.sheets:
+                        mapping_vars[idx]["template_sheet"].set(t.sheets[0] if t.sheets else "")
+
+            t_combo.bind("<<ComboboxSelected>>", lambda e, idx=i, combo=t_sheet_combo: update_template_sheets(e, idx, combo))
+            mv["template_sheet_combo"] = t_sheet_combo
+
+            # 行2: 源起始和目标起始
+            ttk.Label(mf, text="源起始:").grid(row=2, column=0, sticky=W, padx=2, pady=2)
             src_val = ", ".join(mapping.copy_rule.source_start) if isinstance(mapping.copy_rule.source_start, list) else mapping.copy_rule.source_start
             mv["source_start"] = tk.StringVar(value=src_val)
-            ttk.Entry(mf, textvariable=mv["source_start"], width=25).grid(row=1, column=1, sticky=W, padx=2, pady=2)
+            ttk.Entry(mf, textvariable=mv["source_start"], width=22).grid(row=2, column=1, sticky=W, padx=2, pady=2)
 
-            # 目标起始
-            ttk.Label(mf, text="目标起始:").grid(row=1, column=2, sticky=W, padx=2, pady=2)
+            ttk.Label(mf, text="目标起始:").grid(row=2, column=2, sticky=W, padx=2, pady=2)
             tgt_val = ", ".join(mapping.copy_rule.target_start) if isinstance(mapping.copy_rule.target_start, list) else mapping.copy_rule.target_start
             mv["target_start"] = tk.StringVar(value=tgt_val)
-            ttk.Entry(mf, textvariable=mv["target_start"], width=25).grid(row=1, column=3, sticky=W, padx=2, pady=2)
+            ttk.Entry(mf, textvariable=mv["target_start"], width=22).grid(row=2, column=3, sticky=W, padx=2, pady=2)
 
-            # 方向和长度
-            ttk.Label(mf, text="方向:").grid(row=2, column=0, sticky=W, padx=2, pady=2)
+            # 行3: 方向和长度
+            ttk.Label(mf, text="方向:").grid(row=3, column=0, sticky=W, padx=2, pady=2)
             mv["direction"] = tk.StringVar(value=mapping.copy_rule.direction.value)
-            ttk.Combobox(mf, values=["horizontal", "vertical"], textvariable=mv["direction"], width=23, state="readonly").grid(row=2, column=1, sticky=W, padx=2, pady=2)
+            ttk.Combobox(mf, values=["horizontal", "vertical"], textvariable=mv["direction"], width=20, state="readonly").grid(row=3, column=1, sticky=W, padx=2, pady=2)
 
-            ttk.Label(mf, text="长度:").grid(row=2, column=2, sticky=W, padx=2, pady=2)
+            ttk.Label(mf, text="长度:").grid(row=3, column=2, sticky=W, padx=2, pady=2)
             mv["length"] = tk.IntVar(value=mapping.copy_rule.length)
-            ttk.Entry(mf, textvariable=mv["length"], width=25).grid(row=2, column=3, sticky=W, padx=2, pady=2)
+            ttk.Entry(mf, textvariable=mv["length"], width=22).grid(row=3, column=3, sticky=W, padx=2, pady=2)
 
             mapping_vars.append(mv)
 
@@ -698,15 +757,10 @@ class ExcelMigratorApp:
             for mv in mapping_vars:
                 src = mv["source_start"].get().strip()
                 tgt = mv["target_start"].get().strip()
-                # 解析 "数据源名称 > Sheet" 格式
-                ds_sheet_val = mv["ds_sheet"].get()
-                if " > " in ds_sheet_val:
-                    ds_sheet = ds_sheet_val.split(" > ")[-1].strip()
-                else:
-                    ds_sheet = ds_sheet_val
                 sheet_mappings.append({
-                    "data_source_sheet": ds_sheet,
+                    "data_source_sheet": mv["ds_sheet"].get(),
                     "template_file": mv["template"].get(),
+                    "template_sheet": mv["template_sheet"].get(),
                     "copy_rule": {
                         "source_start": [x.strip() for x in src.split(",")] if "," in src else src,
                         "target_start": [x.strip() for x in tgt.split(",")] if "," in tgt else tgt,
@@ -849,8 +903,9 @@ class ExcelMigratorApp:
                 preview_text.insert(END, f"✅ 将执行 {len(matched)} 个迁移:\n\n")
                 for ds, m in matched:
                     r = m.copy_rule
+                    tmpl_sheet = m.template_sheet if m.template_sheet else "默认"
                     preview_text.insert(END, f"• {ds.name} > {m.data_source_sheet}\n")
-                    preview_text.insert(END, f"  → {m.template_file}\n")
+                    preview_text.insert(END, f"  → {m.template_file} > {tmpl_sheet}\n")
                     preview_text.insert(END, f"  规则: {r.source_start} → {r.target_start}, {r.direction.value}, {r.length}格\n\n")
 
                 # 显示将使用的数据源和模板
@@ -947,7 +1002,14 @@ class ExcelMigratorApp:
                 if success:
                     result_text.insert(END, f"✅ 成功: {len(success)} 个\n")
                     for r in success:
-                        result_text.insert(END, f"  - {r.source_sheet} → {r.template_file}\n")
+                        # 显示详细信息
+                        ds_name = ""
+                        for ds in data_sources:
+                            if r.source_sheet in ds.sheets:
+                                ds_name = ds.name
+                                break
+                        result_text.insert(END, f"  - {ds_name} > {r.source_sheet}\n")
+                        result_text.insert(END, f"    → {r.message}\n")
                 if failed:
                     result_text.insert(END, f"\n⚠️ 跳过: {len(failed)} 个\n")
                     for r in failed:
