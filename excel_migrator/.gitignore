@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# Streamlit
+.streamlit/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Temp files
+*.tmp
+*.temp
+~*
+.DS_Store
+
+# Excel temp files
+~$*.xlsx
+
+# Playwright
+.playwright-mcp/
+
+# Backup files
+*.bak
+*.backup
+
+# Storage directory (runtime data)
+storage/*.json
+!storage/.gitkeep
+
+build/
+dist/
