@@ -1,7 +1,6 @@
 """tkinter + ttkbootstrap UI 主应用"""
 import os
 import sys
-import tempfile
 import shutil
 import json
 from datetime import datetime
@@ -270,13 +269,8 @@ class ExcelMigratorApp:
             sheets = get_sheet_names(wb)
             del wb
 
-            # 复制到临时目录
-            temp_dir = tempfile.gettempdir()
-            temp_path = os.path.join(temp_dir, os.path.basename(file_path))
-            shutil.copy2(file_path, temp_path)
-            self.temp_files.append(temp_path)
-
-            item = DataSourceItem.create(name=name, file_path=temp_path, sheets=sheets)
+            # 直接使用原路径
+            item = DataSourceItem.create(name=name, file_path=file_path, sheets=sheets)
             is_new = self.store.save_data_source(item)
 
             if is_new:
@@ -432,12 +426,8 @@ class ExcelMigratorApp:
             sheets = get_sheet_names(wb)
             del wb
 
-            temp_dir = tempfile.gettempdir()
-            temp_path = os.path.join(temp_dir, os.path.basename(file_path))
-            shutil.copy2(file_path, temp_path)
-            self.temp_files.append(temp_path)
-
-            item = TemplateItem.create(name=name, file_path=temp_path, sheets=sheets)
+            # 直接使用原路径
+            item = TemplateItem.create(name=name, file_path=file_path, sheets=sheets)
             is_new = self.store.save_template(item)
 
             messagebox.showinfo("成功", f"{'新增' if is_new else '更新'}模板 '{name}'，包含 {len(sheets)} 个 Sheet")
@@ -480,6 +470,7 @@ class ExcelMigratorApp:
         frame = ttk.Frame(self.root)
 
         ttk.Label(frame, text="映射配置", font=("Microsoft YaHei", 16, "bold")).pack(anchor=W, pady=10)
+        ttk.Label(frame, text="映射配置保存在项目 storage 目录，可导入自定义 JSON 配置文件", bootstyle="info").pack(anchor=W, pady=5)
 
         # 下载示例
         example_frame = ttk.Frame(frame)
