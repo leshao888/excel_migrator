@@ -547,15 +547,24 @@ class ExcelMigratorApp:
         self.detail_text.insert(END, f"映射数量: {len(config_item.config.sheet_mappings)} 个\n")
         self.detail_text.insert(END, "\n" + "="*50 + "\n\n")
 
+        # 获取数据源和模板信息用于显示
+        data_sources = self.store.load_data_sources()
+        templates = self.store.load_templates()
+
         for i, mapping in enumerate(config_item.config.sheet_mappings):
             rule = mapping.copy_rule
+            # 查找对应的数据源名称
+            ds_name = "未知数据源"
+            for ds in data_sources:
+                if mapping.data_source_sheet in ds.sheets:
+                    ds_name = ds.name
+                    break
+
             self.detail_text.insert(END, f"【映射 {i+1}】\n")
+            self.detail_text.insert(END, f"  数据源: {ds_name}\n")
             self.detail_text.insert(END, f"  数据源 Sheet: {mapping.data_source_sheet}\n")
-            self.detail_text.insert(END, f"  模板文件: {mapping.template_file}\n")
-            self.detail_text.insert(END, f"  源起始: {rule.source_start}\n")
-            self.detail_text.insert(END, f"  目标起始: {rule.target_start}\n")
-            self.detail_text.insert(END, f"  方向: {rule.direction.value}\n")
-            self.detail_text.insert(END, f"  长度: {rule.length}\n\n")
+            self.detail_text.insert(END, f"  → 模板文件: {mapping.template_file}\n")
+            self.detail_text.insert(END, f"  复制规则: {rule.source_start} → {rule.target_start}, {rule.direction.value}, {rule.length}格\n\n")
 
         self.detail_text.insert(END, "="*50 + "\n")
         self.detail_text.insert(END, "【完整 JSON 配置】\n")
@@ -624,23 +633,35 @@ class ExcelMigratorApp:
         data_sources = self.store.load_data_sources()
         templates = self.store.load_templates()
 
+        # 构建 "数据源名称 > Sheet" 格式的列表
+        ds_sheet_options = []
+        for ds in data_sources:
+            for sheet in ds.sheets:
+                ds_sheet_options.append(f"{ds.name} > {sheet}")
+
         for i, mapping in enumerate(config_item.config.sheet_mappings):
             mf = ttk.LabelFrame(scrollable, text=f"映射 {i+1}")
             mf.pack(fill=X, pady=3, padx=5)
 
             mv = {"index": i}
 
-            # 数据源Sheet
-            ttk.Label(mf, text="数据源Sheet:").grid(row=0, column=0, sticky=W, padx=2, pady=2)
-            ds_sheets = [s for ds in data_sources for s in ds.sheets] if data_sources else []
-            mv["ds_sheet"] = tk.StringVar(value=mapping.data_source_sheet)
-            ttk.Combobox(mf, values=ds_sheets, textvariable=mv["ds_sheet"], width=20, state="readonly").grid(row=0, column=1, sticky=W, padx=2, pady=2)
+            # 找到当前映射对应的数据源sheet选项
+            current_ds_sheet = ""
+            for ds in data_sources:
+                if mapping.data_source_sheet in ds.sheets:
+                    current_ds_sheet = f"{ds.name} > {mapping.data_source_sheet}"
+                    break
+
+            # 数据源 + Sheet
+            ttk.Label(mf, text="数据源 > Sheet:").grid(row=0, column=0, sticky=W, padx=2, pady=2)
+            mv["ds_sheet"] = tk.StringVar(value=current_ds_sheet)
+            ttk.Combobox(mf, values=ds_sheet_options, textvariable=mv["ds_sheet"], width=25, state="readonly").grid(row=0, column=1, sticky=W, padx=2, pady=2)
 
             # 模板文件
             ttk.Label(mf, text="模板文件:").grid(row=0, column=2, sticky=W, padx=2, pady=2)
             t_files = [os.path.basename(t.file_path) for t in templates] if templates else []
             mv["template"] = tk.StringVar(value=mapping.template_file)
-            ttk.Combobox(mf, values=t_files, textvariable=mv["template"], width=20, state="readonly").grid(row=0, column=3, sticky=W, padx=2, pady=2)
+            ttk.Combobox(mf, values=t_files, textvariable=mv["template"], width=25, state="readonly").grid(row=0, column=3, sticky=W, padx=2, pady=2)
 
             # 源起始
             ttk.Label(mf, text="源起始:").grid(row=1, column=0, sticky=W, padx=2, pady=2)
@@ -657,7 +678,7 @@ class ExcelMigratorApp:
             # 方向和长度
             ttk.Label(mf, text="方向:").grid(row=2, column=0, sticky=W, padx=2, pady=2)
             mv["direction"] = tk.StringVar(value=mapping.copy_rule.direction.value)
-            ttk.Combobox(mf, values=["horizontal", "vertical"], textvariable=mv["direction"], width=18, state="readonly").grid(row=2, column=1, sticky=W, padx=2, pady=2)
+            ttk.Combobox(mf, values=["horizontal", "vertical"], textvariable=mv["direction"], width=23, state="readonly").grid(row=2, column=1, sticky=W, padx=2, pady=2)
 
             ttk.Label(mf, text="长度:").grid(row=2, column=2, sticky=W, padx=2, pady=2)
             mv["length"] = tk.IntVar(value=mapping.copy_rule.length)
@@ -677,8 +698,14 @@ class ExcelMigratorApp:
             for mv in mapping_vars:
                 src = mv["source_start"].get().strip()
                 tgt = mv["target_start"].get().strip()
+                # 解析 "数据源名称 > Sheet" 格式
+                ds_sheet_val = mv["ds_sheet"].get()
+                if " > " in ds_sheet_val:
+                    ds_sheet = ds_sheet_val.split(" > ")[-1].strip()
+                else:
+                    ds_sheet = ds_sheet_val
                 sheet_mappings.append({
-                    "data_source_sheet": mv["ds_sheet"].get(),
+                    "data_source_sheet": ds_sheet,
                     "template_file": mv["template"].get(),
                     "copy_rule": {
                         "source_start": [x.strip() for x in src.split(",")] if "," in src else src,
@@ -759,35 +786,16 @@ class ExcelMigratorApp:
             ttk.Label(frame, text="暂无映射配置，请先在【映射配置】中添加", bootstyle="danger").pack(pady=20)
             return frame
 
-        # 选择区
-        select_frame = ttk.LabelFrame(frame, text="选择数据源、模板和映射配置")
+        # 只选择映射配置
+        select_frame = ttk.LabelFrame(frame, text="选择映射配置（数据源和模板将根据配置自动匹配）")
         select_frame.pack(fill=X, pady=10)
 
-        # 数据源
-        ds_frame = ttk.Frame(select_frame)
-        ds_frame.pack(fill=X, pady=5)
-        ttk.Label(ds_frame, text="数据源:").pack(side=LEFT, padx=5)
-        ds_var = tk.StringVar(value=data_sources[0].name)
-        ds_combo = ttk.Combobox(ds_frame, values=[ds.name for ds in data_sources],
-                                textvariable=ds_var, state="readonly", width=30)
-        ds_combo.pack(side=LEFT, padx=5)
-
-        # 模板
-        t_frame = ttk.Frame(select_frame)
-        t_frame.pack(fill=X, pady=5)
-        ttk.Label(t_frame, text="模板:").pack(side=LEFT, padx=5)
-        t_var = tk.StringVar(value=templates[0].name)
-        t_combo = ttk.Combobox(t_frame, values=[t.name for t in templates],
-                                textvariable=t_var, state="readonly", width=30)
-        t_combo.pack(side=LEFT, padx=5)
-
-        # 映射配置
         cfg_frame = ttk.Frame(select_frame)
         cfg_frame.pack(fill=X, pady=5)
         ttk.Label(cfg_frame, text="映射配置:").pack(side=LEFT, padx=5)
         cfg_var = tk.StringVar(value=configs[0].name)
         cfg_combo = ttk.Combobox(cfg_frame, values=[c.name for c in configs],
-                                  textvariable=cfg_var, state="readonly", width=30)
+                                  textvariable=cfg_var, state="readonly", width=40)
         cfg_combo.pack(side=LEFT, padx=5)
 
         # 预览区
@@ -808,45 +816,56 @@ class ExcelMigratorApp:
             preview_text.config(state="normal")
             preview_text.delete("1.0", END)
 
-            ds_name = ds_var.get()
             cfg_name = cfg_var.get()
-
-            ds = next((d for d in data_sources if d.name == ds_name), None)
             cfg = next((c for c in configs if c.name == cfg_name), None)
 
-            if not ds or not cfg:
-                preview_text.insert("1.0", "请选择数据源和映射配置")
+            if not cfg:
+                preview_text.insert("1.0", "请选择映射配置")
                 preview_text.config(state="disabled")
                 return
 
+            # 构建数据源sheet到数据源的映射
+            ds_sheet_to_ds = {}
+            for ds in data_sources:
+                for sheet in ds.sheets:
+                    ds_sheet_to_ds[sheet] = ds
+
             template_name_map = {os.path.basename(t.file_path): t for t in templates}
 
-            matched, unmatched_src, unmatched_tgt = [], [], []
+            matched, unmatched_src, unmatched_tgt, used_ds = [], [], [], set()
 
             for m in cfg.config.sheet_mappings:
-                if m.data_source_sheet not in ds.sheets:
+                ds = ds_sheet_to_ds.get(m.data_source_sheet)
+                if not ds:
                     unmatched_src.append(m.data_source_sheet)
                     continue
                 if m.template_file not in template_name_map:
                     unmatched_tgt.append(m.template_file)
                     continue
-                matched.append(m)
+                matched.append((ds, m))
+                used_ds.add(ds.name)
 
             if matched:
-                preview_text.insert(END, f"✅ 将迁移 {len(matched)} 个 Sheet:\n\n")
-                for m in matched:
+                preview_text.insert(END, f"✅ 将执行 {len(matched)} 个迁移:\n\n")
+                for ds, m in matched:
                     r = m.copy_rule
-                    preview_text.insert(END, f"• {m.data_source_sheet} → {m.template_file}\n")
-                    preview_text.insert(END, f"  {r.source_start} → {r.target_start}, {r.direction.value}, {r.length}格\n\n")
+                    preview_text.insert(END, f"• {ds.name} > {m.data_source_sheet}\n")
+                    preview_text.insert(END, f"  → {m.template_file}\n")
+                    preview_text.insert(END, f"  规则: {r.source_start} → {r.target_start}, {r.direction.value}, {r.length}格\n\n")
+
+                # 显示将使用的数据源和模板
+                preview_text.insert(END, "="*50 + "\n")
+                preview_text.insert(END, f"将使用 {len(used_ds)} 个数据源: {', '.join(used_ds)}\n")
+                t_used = set(os.path.basename(t.file_path) for _, m in matched for t in templates if os.path.basename(t.file_path) == m.template_file)
+                preview_text.insert(END, f"将使用 {len(t_used)} 个模板: {', '.join(t_used)}\n")
 
             if unmatched_src:
-                preview_text.insert(END, f"⚠️ 数据源中不存在 ({len(unmatched_src)}): {', '.join(unmatched_src)}\n")
+                preview_text.insert(END, f"\n⚠️ 数据源中不存在 ({len(unmatched_src)}): {', '.join(unmatched_src)}\n")
             if unmatched_tgt:
                 preview_text.insert(END, f"⚠️ 未找到模板 ({len(unmatched_tgt)}): {', '.join(unmatched_tgt)}\n")
 
             preview_text.config(state="disabled")
 
-        ds_combo.bind("<<ComboboxSelected>>", update_preview)
         cfg_combo.bind("<<ComboboxSelected>>", update_preview)
 
         # 执行按钮
@@ -858,48 +877,68 @@ class ExcelMigratorApp:
             result_text.delete("1.0", END)
             result_text.update()
 
-            ds = next((d for d in data_sources if d.name == ds_var.get()), None)
-            t_item = next((t for t in templates if t.name == t_var.get()), None)
             cfg = next((c for c in configs if c.name == cfg_var.get()), None)
-
-            if not all([ds, t_item, cfg]):
-                result_text.insert("1.0", "请确保已选择数据源、模板和映射配置")
+            if not cfg:
+                result_text.insert("1.0", "请选择映射配置")
                 result_text.config(state="disabled")
                 return
 
-            if not file_exists(ds.file_path):
-                result_text.insert("1.0", f"❌ 数据源文件不存在: {ds.file_path}")
-                result_text.config(state="disabled")
-                return
-            if not file_exists(t_item.file_path):
-                result_text.insert("1.0", f"❌ 模板文件不存在: {t_item.file_path}")
+            # 自动匹配数据源和模板
+            ds_sheet_to_ds = {}
+            for ds in data_sources:
+                for sheet in ds.sheets:
+                    ds_sheet_to_ds[sheet] = ds
+
+            template_name_map = {os.path.basename(t.file_path): t for t in templates}
+
+            # 按模板文件分组映射
+            template_groups = {}
+            for m in cfg.config.sheet_mappings:
+                ds = ds_sheet_to_ds.get(m.data_source_sheet)
+                t_item = template_name_map.get(m.template_file)
+                if not ds or not t_item:
+                    continue
+                if m.template_file not in template_groups:
+                    template_groups[m.template_file] = {"ds": ds, "t_item": t_item, "mappings": []}
+                template_groups[m.template_file]["mappings"].append(m)
+
+            if not template_groups:
+                result_text.insert("1.0", "❌ 无法匹配任何有效的数据源和模板组合\n请确保数据源和模板已正确导入")
                 result_text.config(state="disabled")
                 return
 
             try:
-                source_wb = load_excel(ds.file_path, data_only=True)
-                template_name_map = {os.path.basename(t.file_path): t for t in templates}
-                target_path = t_item.file_path
-
-                if is_file_locked(target_path):
-                    target_path = _generate_copy_path(target_path)
-                    shutil.copy2(t_item.file_path, target_path)
-                    result_text.insert(END, f"📁 原始文件被占用，已生成副本\n\n")
-                    result_text.update()
-
-                target_wb = load_excel(target_path)
-                copier = DataCopier(write_mode=WriteMode.OVERWRITE)
                 all_results = []
 
-                for mapping in cfg.config.sheet_mappings:
-                    if mapping.data_source_sheet not in ds.sheets:
-                        continue
-                    if mapping.template_file not in template_name_map:
-                        continue
-                    result = copier.copy(source_wb, target_wb, mapping)
-                    all_results.append(result)
+                for t_file, group in template_groups.items():
+                    ds = group["ds"]
+                    t_item = group["t_item"]
+                    mappings = group["mappings"]
 
-                target_wb.save(target_path)
+                    if not file_exists(ds.file_path):
+                        result_text.insert(END, f"❌ 数据源文件不存在: {ds.file_path}\n")
+                        continue
+                    if not file_exists(t_item.file_path):
+                        result_text.insert(END, f"❌ 模板文件不存在: {t_item.file_path}\n")
+                        continue
+
+                    source_wb = load_excel(ds.file_path, data_only=True)
+                    target_path = t_item.file_path
+
+                    if is_file_locked(target_path):
+                        target_path = _generate_copy_path(target_path)
+                        shutil.copy2(t_item.file_path, target_path)
+                        result_text.insert(END, f"📁 原始文件被占用，已生成副本: {target_path}\n")
+                        result_text.update()
+
+                    target_wb = load_excel(target_path)
+                    copier = DataCopier(write_mode=WriteMode.OVERWRITE)
+
+                    for mapping in mappings:
+                        result = copier.copy(source_wb, target_wb, mapping)
+                        all_results.append(result)
+
+                    target_wb.save(target_path)
 
                 success = [r for r in all_results if r.success]
                 failed = [r for r in all_results if not r.success]
