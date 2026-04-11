@@ -565,54 +565,48 @@ class ExcelMigratorApp:
 
     def _edit_selected_mapping(self):
         """编辑选中的映射配置"""
-        configs = self.store.load_mapping_configs()
-        if not configs:
-            messagebox.showwarning("提示", "暂无映射配置可编辑")
+        list_frame = self._find_list_frame("mapping")
+        if not list_frame:
+            messagebox.showwarning("提示", "请先选择一个映射配置")
             return
 
-        # 弹出选择对话框
-        dialog = tk.Toplevel(self.root)
-        dialog.title("选择要编辑的配置")
-        dialog.geometry("400x120")
-        dialog.transient(self.root)
-        dialog.grab_set()
+        # 找到treeview和选中的项
+        tree = None
+        for widget in list_frame.winfo_children():
+            if isinstance(widget, ttk.Treeview):
+                tree = widget
+                break
 
-        ttk.Label(dialog, text="选择映射配置:").pack(pady=10)
+        if not tree or not tree.selection():
+            messagebox.showwarning("提示", "请先在列表中选择一个映射配置")
+            return
 
-        selected_config = [None]
-        combo = ttk.Combobox(dialog, values=[c.name for c in configs], state="readonly", width=40)
-        combo.current(0)
-        combo.pack(pady=10)
+        config_id = tree.item(tree.selection()[0])["tags"][0]
+        config_item = self.store.get_mapping_config(config_id)
+        if not config_item:
+            return
 
-        def do_edit():
-            idx = combo.current()
-            if idx >= 0 and idx < len(configs):
-                dialog.destroy()
-                self._open_mapping_editor(configs[idx])
-
-        ttk.Button(dialog, text="编辑", bootstyle="primary", command=do_edit).pack(pady=5)
+        self._open_mapping_editor(config_item)
 
     def _open_mapping_editor(self, config_item):
         """打开映射配置编辑器"""
         dialog = tk.Toplevel(self.root)
-        dialog.title(f"编辑映射配置 - {config_item.name}")
+        dialog.title(f"编辑映射配置")
         dialog.geometry("900x600")
         dialog.transient(self.root)
 
         main_frame = ttk.Frame(dialog)
         main_frame.pack(fill=BOTH, expand=True, padx=10, pady=10)
 
-        # 基本信息（名称可编辑）
+        # 基本信息（名称只读）
         info_frame = ttk.LabelFrame(main_frame, text="基本信息")
         info_frame.pack(fill=X, pady=5)
 
         ttk.Label(info_frame, text="配置名称:").grid(row=0, column=0, sticky=W, padx=5, pady=5)
-        name_var = tk.StringVar(value=config_item.name)
-        ttk.Entry(info_frame, textvariable=name_var, width=40).grid(row=0, column=1, sticky=W, padx=5, pady=5)
+        ttk.Label(info_frame, text=config_item.name, bootstyle="info").grid(row=0, column=1, sticky=W, padx=5, pady=5)
 
-        ttk.Label(info_frame, text="JSON路径:").grid(row=0, column=2, sticky=W, padx=5, pady=5)
-        path_label = ttk.Label(info_frame, text="存储在配置文件中，不可编辑", bootstyle="info")
-        path_label.grid(row=0, column=3, sticky=W, padx=5, pady=5)
+        ttk.Label(info_frame, text="存储位置:").grid(row=0, column=2, sticky=W, padx=5, pady=5)
+        ttk.Label(info_frame, text="storage/mapping_configs.json", bootstyle="secondary").grid(row=0, column=3, sticky=W, padx=5, pady=5)
 
         # 映射列表
         mappings_frame = ttk.LabelFrame(main_frame, text="映射列表")
@@ -706,7 +700,7 @@ class ExcelMigratorApp:
 
             updated = MappingConfigItem(
                 id=config_item.id,
-                name=name_var.get().strip(),
+                name=config_item.name,
                 config=new_config,
                 created_at=config_item.created_at,
                 updated_at=datetime.now().isoformat()
