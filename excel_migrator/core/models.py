@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Optional, Union
 import uuid
 
-from core.enums import Direction, WriteMode
+from core.enums import Direction, WriteMode, normalize_string, normalize_list_string
 
 
 @dataclass
@@ -17,11 +17,27 @@ class CopyRule:
 
     @classmethod
     def from_dict(cls, data: dict) -> "CopyRule":
+        # 处理方向：支持大小写不敏感和全角
+        direction_value = data.get("direction", "horizontal")
+        direction = Direction.from_string(direction_value)
+
+        # 处理长度：如果是带逗号的字符串（如 "12" 错误输入），取第一个有效数字
+        length_value = data.get("length", 10)
+        if isinstance(length_value, str):
+            # 清理可能的中文逗号并取第一个数字
+            length_str = normalize_string(length_value).split(",")[0].strip()
+            try:
+                length = int(length_str)
+            except (ValueError, TypeError):
+                length = 10
+        else:
+            length = int(length_value)
+
         return cls(
             source_start=data["source_start"],
             target_start=data["target_start"],
-            direction=Direction(data.get("direction", "horizontal")),
-            length=data["length"]
+            direction=direction,
+            length=length
         )
 
     def to_dict(self) -> dict:
@@ -99,7 +115,7 @@ class MappingConfig:
     """完整映射配置"""
     version: str = "1.0"
     default_direction: Direction = Direction.HORIZONTAL
-    default_write_mode: WriteMode = WriteMode.SKIP_NONEMPTY
+    write_mode: WriteMode = WriteMode.SKIP_NONEMPTY  # 写入模式：skip_nonempty 或 overwrite
     sheet_mappings: list[SheetMapping] = field(default_factory=list)
 
     @classmethod
@@ -107,8 +123,8 @@ class MappingConfig:
         sheet_mappings = [SheetMapping.from_dict(m) for m in data.get("sheet_mappings", [])]
         return cls(
             version=data.get("version", "1.0"),
-            default_direction=Direction(data.get("default_direction", "horizontal")),
-            default_write_mode=WriteMode(data.get("default_write_mode", "skip_nonempty")),
+            default_direction=Direction.from_string(data.get("default_direction", "horizontal")),
+            write_mode=WriteMode.from_string(data.get("write_mode", "skip_nonempty")),
             sheet_mappings=sheet_mappings
         )
 
@@ -116,7 +132,7 @@ class MappingConfig:
         return {
             "version": self.version,
             "default_direction": self.default_direction.value,
-            "default_write_mode": self.default_write_mode.value,
+            "write_mode": self.write_mode.value,
             "sheet_mappings": [m.to_dict() for m in self.sheet_mappings]
         }
 

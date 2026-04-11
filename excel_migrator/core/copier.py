@@ -8,7 +8,8 @@ from utils.excel_utils import (
     read_range_data_with_format,
     write_range_data_with_format,
     get_worksheet,
-    get_sheet_names
+    get_sheet_names,
+    auto_fit_column_width
 )
 
 
@@ -71,6 +72,8 @@ class DataCopier:
                         types,
                         self._write_mode.value
                     )
+                    # 自动调整列宽
+                    auto_fit_column_width(target_ws, tgt_start, rule.direction, rule.length, data, formats)
                     total_rows += len(data)
                 return CopyResult(
                     success=True,
@@ -98,6 +101,8 @@ class DataCopier:
                     types,
                     self._write_mode.value
                 )
+                # 自动调整列宽
+                auto_fit_column_width(target_ws, rule.target_start, rule.direction, rule.length, data, formats)
 
                 return CopyResult(
                     success=True,
@@ -122,8 +127,82 @@ class DataCopier:
         config: MappingConfig
     ) -> list[CopyResult]:
         """执行所有 sheet 的数据复制"""
+        # 使用 MappingConfig 中的写入模式
+        write_mode = config.write_mode.value
         results = []
         for mapping in config.sheet_mappings:
-            result = self.copy(source_wb, target_wb, mapping)
+            result = self._copy_with_mode(source_wb, target_wb, mapping, write_mode)
             results.append(result)
         return results
+
+    def _copy_with_mode(
+        self,
+        source_wb: Workbook,
+        target_wb: Workbook,
+        mapping: SheetMapping,
+        write_mode: str
+    ) -> CopyResult:
+        """使用指定写入模式执行复制"""
+        try:
+            source_sheet_name = mapping.data_source_sheet
+            template_file = mapping.template_file
+
+            if source_sheet_name not in get_sheet_names(source_wb):
+                return CopyResult(
+                    success=False,
+                    source_sheet=source_sheet_name,
+                    template_file=template_file,
+                    message=f"数据源中不存在 Sheet: {source_sheet_name}"
+                )
+
+            target_sheet_name = mapping.template_sheet if mapping.template_sheet else get_sheet_names(target_wb)[0]
+
+            source_ws = get_worksheet(source_wb, source_sheet_name)
+            target_ws = get_worksheet(target_wb, target_sheet_name)
+
+            rule = mapping.copy_rule
+
+            if rule.is_array_mode():
+                pairs = rule.get_pairs()
+                total_rows = 0
+                for src_start, tgt_start in pairs:
+                    data, formats, types = read_range_data_with_format(
+                        source_ws, src_start, rule.direction, rule.length
+                    )
+                    write_range_data_with_format(
+                        target_ws, tgt_start, rule.direction, rule.length,
+                        data, formats, types, write_mode
+                    )
+                    auto_fit_column_width(target_ws, tgt_start, rule.direction, rule.length, data, formats)
+                    total_rows += len(data)
+                return CopyResult(
+                    success=True,
+                    source_sheet=source_sheet_name,
+                    template_file=template_file,
+                    message=f"成功复制 {len(pairs)} 组数据到 {template_file} ({target_sheet_name})",
+                    rows_copied=total_rows
+                )
+            else:
+                data, formats, types = read_range_data_with_format(
+                    source_ws, rule.source_start, rule.direction, rule.length
+                )
+                write_range_data_with_format(
+                    target_ws, rule.target_start, rule.direction, rule.length,
+                    data, formats, types, write_mode
+                )
+                auto_fit_column_width(target_ws, rule.target_start, rule.direction, rule.length, data, formats)
+                return CopyResult(
+                    success=True,
+                    source_sheet=source_sheet_name,
+                    template_file=template_file,
+                    message=f"成功复制到 {template_file} ({target_sheet_name})",
+                    rows_copied=len(data)
+                )
+
+        except Exception as e:
+            return CopyResult(
+                success=False,
+                source_sheet=mapping.data_source_sheet,
+                template_file=mapping.template_file,
+                message=f"复制失败: {str(e)}"
+            )

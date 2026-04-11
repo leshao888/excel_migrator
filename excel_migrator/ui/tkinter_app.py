@@ -14,7 +14,7 @@ from tkinter import filedialog, messagebox, scrolledtext
 from config import STORAGE_DIR, DATA_SOURCES_FILE, TEMPLATES_FILE, MAPPING_CONFIGS_FILE, EXAMPLE_MAPPING_FILENAME, DEFAULT_DIRECTION, DEFAULT_WRITE_MODE
 from storage.store import StorageManager
 from core.models import DataSourceItem, TemplateItem, MappingConfigItem, MappingConfig, SheetMapping, CopyRule
-from core.enums import Direction, WriteMode
+from core.enums import Direction, WriteMode, normalize_string, normalize_list_string
 from core.copier import DataCopier
 from utils.excel_utils import get_sheet_names, load_excel
 from utils.path_utils import file_exists, is_file_locked
@@ -567,7 +567,8 @@ class ExcelMigratorApp:
             self.detail_text.insert(END, f"【映射 {i+1}】\n")
             self.detail_text.insert(END, f"  数据源: {ds_name} > {mapping.data_source_sheet}\n")
             self.detail_text.insert(END, f"  → 模板: {mapping.template_file} > {tmpl_sheet}\n")
-            self.detail_text.insert(END, f"  规则: {rule.source_start} → {rule.target_start}, {rule.direction.value}, {rule.length}格\n\n")
+            self.detail_text.insert(END, f"  规则: {rule.source_start} → {rule.target_start}, {rule.direction.value}, {rule.length}格\n")
+            self.detail_text.insert(END, f"  写入: {config_item.config.write_mode.value}\n\n")
 
         self.detail_text.insert(END, "="*50 + "\n")
         self.detail_text.insert(END, "【完整 JSON 配置】\n")
@@ -616,6 +617,19 @@ class ExcelMigratorApp:
 
         ttk.Label(info_frame, text="配置名称:").grid(row=0, column=0, sticky=W, padx=5, pady=5)
         ttk.Label(info_frame, text=config_item.name, bootstyle="info").grid(row=0, column=1, sticky=W, padx=5, pady=5)
+
+        # 写入模式选择
+        ttk.Label(info_frame, text="写入模式:").grid(row=0, column=2, sticky=W, padx=5, pady=5)
+        write_mode_var = tk.StringVar(value=config_item.config.write_mode.value)
+        write_mode_combo = ttk.Combobox(
+            info_frame,
+            values=["skip_nonempty", "overwrite"],
+            textvariable=write_mode_var,
+            width=15,
+            state="readonly"
+        )
+        write_mode_combo.grid(row=0, column=3, sticky=W, padx=5, pady=5)
+        ttk.Label(info_frame, text="(skip:只写空行, overwrite:直接覆盖)", bootstyle="secondary").grid(row=0, column=4, sticky=W, padx=5, pady=5)
 
         # 映射列表
         mappings_frame = ttk.LabelFrame(main_frame, text="映射列表")
@@ -755,8 +769,17 @@ class ExcelMigratorApp:
         def do_save():
             sheet_mappings = []
             for mv in mapping_vars:
-                src = mv["source_start"].get().strip()
-                tgt = mv["target_start"].get().strip()
+                # 规范化输入：处理全角逗号、中文逗号等
+                src = normalize_list_string(mv["source_start"].get().strip())
+                tgt = normalize_list_string(mv["target_start"].get().strip())
+                direction = normalize_string(mv["direction"].get())
+                # 长度：取第一个有效数字
+                length_str = normalize_string(str(mv["length"].get()))
+                try:
+                    length = int(length_str.split(",")[0].strip())
+                except (ValueError, TypeError):
+                    length = 10
+
                 sheet_mappings.append({
                     "data_source_sheet": mv["ds_sheet"].get(),
                     "template_file": mv["template"].get(),
@@ -764,15 +787,18 @@ class ExcelMigratorApp:
                     "copy_rule": {
                         "source_start": [x.strip() for x in src.split(",")] if "," in src else src,
                         "target_start": [x.strip() for x in tgt.split(",")] if "," in tgt else tgt,
-                        "direction": mv["direction"].get(),
-                        "length": mv["length"].get()
+                        "direction": direction,
+                        "length": length
                     }
                 })
+
+            # 规范化写入模式
+            write_mode = normalize_string(write_mode_var.get())
 
             new_config = MappingConfig.from_dict({
                 "version": "1.0",
                 "default_direction": config_item.config.default_direction.value,
-                "default_write_mode": config_item.config.default_write_mode.value,
+                "write_mode": write_mode,
                 "sheet_mappings": sheet_mappings
             })
 

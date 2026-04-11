@@ -1,6 +1,7 @@
 """Excel 工具函数"""
 from openpyxl import load_workbook, Workbook
 from openpyxl.worksheet.worksheet import Worksheet
+from openpyxl.utils import get_column_letter
 
 from core.enums import Direction
 
@@ -205,7 +206,7 @@ def read_range_data_with_format(ws: Worksheet, start_cell: str, direction: Direc
             col_formats[col].append((row, cell.number_format))
             col_types[col].append((row, cell.data_type))
 
-        # 按列号排序并整理数据
+        # 按列号排序并整理数据 - 纵向模式每个值作为单独一行
         result = []
         formats_result = []
         types_result = []
@@ -213,9 +214,11 @@ def read_range_data_with_format(ws: Worksheet, start_cell: str, direction: Direc
             sorted_data = sorted(col_data[col], key=lambda x: x[0])
             sorted_formats = sorted(col_formats[col], key=lambda x: x[0])
             sorted_types = sorted(col_types[col], key=lambda x: x[0])
-            result.append([val for _, val in sorted_data])
-            formats_result.append([fmt for _, fmt in sorted_formats])
-            types_result.append([t for _, t in sorted_types])
+            # 每个值作为单独的一行（纵向模式）
+            for i, (row, val) in enumerate(sorted_data):
+                result.append([val])
+                formats_result.append([sorted_formats[i][1]])
+                types_result.append([sorted_types[i][1]])
         return result, formats_result, types_result
 
 
@@ -294,3 +297,75 @@ def write_range_data_with_format(
                 # 应用格式
                 if formats and col in col_formats and row in col_formats[col]:
                     ws[cell_addr].number_format = col_formats[col][row]
+
+
+def auto_fit_column_width(ws: Worksheet, start_cell: str, direction: Direction, length: int, data: list[list], formats: list[list] = None):
+    """
+    自动调整列宽以适应数据
+    """
+    cells = calculate_cell_position(start_cell, direction, length)
+
+    if direction == Direction.HORIZONTAL:
+        # 按列分组
+        col_data = {}
+        for i, cell_addr in enumerate(cells):
+            col, row = _parse_cell(cell_addr)
+            if col not in col_data:
+                col_data[col] = []
+            data_row = i // length
+            data_col = i % length
+            value = data[data_row][data_col] if data_row < len(data) and data_col < len(data[data_row]) else None
+            fmt = formats[data_row][data_col] if formats and data_row < len(formats) and data_col < len(formats[data_row]) else None
+            col_data[col].append((value, fmt))
+
+        # 设置每列宽度
+        for col, items in col_data.items():
+            max_len = 0
+            for value, fmt in items:
+                if value is None:
+                    continue
+                str_val = str(value)
+                # 如果有格式，估算格式后的长度
+                if fmt and fmt != 'General':
+                    # 会计格式通常需要更多空间
+                    if '#,##0' in fmt or '#,##' in fmt:
+                        # 数字格式，估算显示宽度
+                        try:
+                            num = float(value)
+                            str_val = f"{num:,.0f}"
+                        except:
+                            pass
+                max_len = max(max_len, len(str_val))
+            # 设置列宽，最小10，最大50
+            col_letter_str = get_column_letter(col)
+            ws.column_dimensions[col_letter_str].width = max(min(max_len + 2, 50), 10)
+    else:
+        # 纵向模式
+        col_data = {}
+        for i, cell_addr in enumerate(cells):
+            col, row = _parse_cell(cell_addr)
+            if col not in col_data:
+                col_data[col] = []
+            data_row = i % length
+            data_col = i // length
+            value = data[data_row][data_col] if data_row < len(data) and data_col < len(data[data_row]) else None
+            fmt = formats[data_row][data_col] if formats and data_row < len(formats) and data_col < len(formats[data_row]) else None
+            col_data[col].append((value, fmt))
+
+        # 设置每列宽度
+        for col, items in col_data.items():
+            max_len = 0
+            for value, fmt in items:
+                if value is None:
+                    continue
+                str_val = str(value)
+                if fmt and fmt != 'General':
+                    if '#,##0' in fmt or '#,##' in fmt:
+                        try:
+                            num = float(value)
+                            str_val = f"{num:,.0f}"
+                        except:
+                            pass
+                max_len = max(max_len, len(str_val))
+            col_letter_str = get_column_letter(col)
+            ws.column_dimensions[col_letter_str].width = max(min(max_len + 2, 50), 10)

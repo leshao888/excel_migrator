@@ -1,79 +1,103 @@
 # Excel 数据迁移工具 - 版本说明
 
-## v1.0 (2026-04-10)
+## v1.0 (2026-04-12)
+
+### 新增功能
+
+#### 1. 界面全新升级
+- 从 Streamlit Web 界面切换到 tkinter + ttkbootstrap 桌面 UI
+- 更小的打包体积，方便分发
+- 更现代的界面设计
+
+#### 2. 写入模式选择
+- **skip_nonempty**: 只写入空单元格，已有内容的单元格会被跳过
+- **overwrite**: 直接覆盖，无论是否已有内容
+- 支持在编辑映射配置时选择写入模式
+
+#### 3. 模板 Sheet 选择
+- 新增 `template_sheet` 字段，可指定模板中的目标 Sheet
+- 便于一个模板文件有多个 Sheet 时精准定位
+
+#### 4. 垂直复制修复
+- 修复纵向模式下多单元格复制的 bug
+- 现在正确支持 `direction: "vertical"` 的多单元格复制
+
+#### 5. 输入兼容性增强
+- **中文逗号支持**: "12，13" 自动转为 "12,13"
+- **大小写不敏感**: "Horizontal"、"HORIZONTAL" 效果相同
+- **全角转半角**: 自动处理全角字符
+
+#### 6. 列宽自动调整
+- 复制数据后自动调整列宽
+- 避免大数字显示为 "#####"
 
 ### 功能特性
 
 #### 1. 数据源管理
 - 支持上传 Excel 文件（.xlsx, .xlsm）作为数据源
 - 自动读取并保存 Sheet 列表
-- 文件复制到临时目录存储，确保原文件不受影响
+- 支持单个/批量导入
 - 支持更新和删除已保存的数据源
-- 自动检测文件是否存在、是否被其他程序占用
+- 自动检测文件是否存在、是否被占用
 
 #### 2. 模板管理
 - 支持上传 Excel 模板文件
 - 自动记录模板包含的 Sheet 信息
+- 支持单个/批量导入
 - 支持更新和删除已保存的模板
-- 文件状态检测（存在性、占用状态）
 
 #### 3. 映射配置
 - 导入 JSON 格式的映射配置文件
-- 支持下载示例配置文件（包含多条映射示例）
-- **显示配置文件位置**，方便用户直接编辑 JSON 文件
+- 支持下载示例配置文件
 - 完整的映射规则设置：
   - 数据源 Sheet 名称
   - 目标模板文件名
+  - 目标模板 Sheet（可选）
   - 复制规则（源起始单元格、目标起始单元格、方向、长度）
-- **支持数组模式**：source_start 和 target_start 可为数组，实现多个起点的一一映射
-  - 格式：`"source_start": ["A1", "B1", "C1"]`
-  - 对应关系：`A1→D1, B1→E1, C1→F1`（索引一一对应）
-- 支持多条映射规则同时存在
+- **写入模式**: skip_nonempty / overwrite
+- **支持数组模式**：多个起点一一映射
 - 支持在修改界面动态添加/删除映射规则
-- 支持修改和删除已有配置
+- 支持编辑和删除已有配置
 
 #### 4. 执行迁移
-- 智能选择数据源、模板和映射配置
-- 映射预览功能，显示匹配和不匹配的 Sheet
+- 智能选择映射配置
+- 自动匹配数据源和模板
+- 映射预览功能
 - 自动处理文件占用情况（生成副本）
 - 批量复制 Sheet 数据
-- **保留数字格式**：复制时保留单元格的 number_format（如货币格式、百分比等）
+- **保留数字格式**：复制时保留单元格的 number_format
+- **自动调整列宽**：避免数字显示为 #####
 - **读取公式计算值**：源文件中的公式会读取其计算结果
-- 详细的执行结果报告（成功/失败数量）
-- 使用覆盖模式确保数据正确写入
+- 详细的执行结果报告
 
 ### 技术特性
 
 - **架构**: 分层架构（core/storage/ui/utils）
 - **持久化**: JSON 文件存储
 - **Excel 处理**: openpyxl
-- **Web 界面**: Streamlit
-- **Python 版本**: 3.x
+- **桌面 UI**: tkinter + ttkbootstrap
+- **Python 版本**: 3.8+
+- **打包工具**: PyInstaller
 
 ### 文件结构
 
 ```
 excel_migrator/
-├── core/           # 核心业务逻辑
-│   ├── models.py    # 数据模型定义
-│   ├── copier.py    # 数据复制逻辑
-│   └── enums.py     # 枚举类型
-├── storage/        # 存储层
-│   ├── store.py     # 存储管理器
-│   └── adapters/    # 存储适配器
-├── ui/             # 用户界面
-│   ├── pages/       # 页面
-│   │   ├── data_source_page.py
-│   │   ├── template_page.py
-│   │   ├── mapping_page.py
-│   │   └── migrate_page.py
-│   └── components.py
-├── utils/          # 工具函数
-│   ├── excel_utils.py
-│   └── path_utils.py
-├── config.py       # 全局配置
-├── main.py         # 主入口
-└── VERSION.md      # 版本说明
+├── core/              # 核心业务逻辑
+│   ├── models.py      # 数据模型定义
+│   ├── copier.py      # 数据复制逻辑
+│   └── enums.py       # 枚举类型
+├── storage/           # 存储层
+│   └── store.py       # 存储管理器
+├── ui/                # 用户界面
+│   └── tkinter_app.py # tkinter 主应用
+├── utils/             # 工具函数
+│   ├── excel_utils.py # Excel 操作工具
+│   └── path_utils.py  # 路径工具
+├── config.py          # 全局配置
+├── gui.py             # 主入口
+├── MANUAL.md          # 操作手册
+└── VERSION.md         # 版本说明
 ```
 
 ### 复制规则说明
@@ -82,14 +106,25 @@ excel_migrator/
 |------|------|------|
 | source_start | 数据源起始单元格（支持数组）| F4 或 ["F4", "F11", "F12"] |
 | target_start | 模板起始单元格（支持数组）| C5 或 ["C5", "C15", "C16"] |
+| template_sheet | 模板目标 Sheet | Sheet1 |
 | direction | 复制方向 | horizontal（横向）/ vertical（纵向）|
 | length | 复制长度（单元格数）| 12 |
+| write_mode | 写入模式 | skip_nonempty / overwrite |
 
 **数组模式示例：**
 ```
 source_start: ["F4", "F11", "F12", "F13"]
 target_start: ["C5", "C15", "C16", "C17"]
 对应关系：F4→C5, F11→C15, F12→C16, F13→C17
+```
+
+**垂直模式示例：**
+```
+source_start: "F10"
+target_start: "C5"
+direction: "vertical"
+length: 5
+对应关系：F10→C5, F11→C6, F12→C7, F13→C8, F14→C9
 ```
 
 ### 典型工作流程
@@ -105,7 +140,7 @@ target_start: ["C5", "C15", "C16", "C17"]
    - 导入映射配置文件
 
 3. **执行阶段**
-   - 选择数据源、模板、映射配置
+   - 选择映射配置
    - 预览映射结果
    - 执行迁移
 
