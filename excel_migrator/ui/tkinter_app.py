@@ -227,18 +227,28 @@ class ExcelMigratorApp:
         ttk.Button(btn_frame, text="🗑️ 删除", bootstyle="danger", command=on_delete).pack(side=LEFT, padx=5)
 
     def _find_list_frame(self, page):
-        """找到指定页面的列表frame"""
-        # 简单通过遍历查找
-        for widget in self.current_page.winfo_children():
-            if isinstance(widget, ttk.LabelFrame):
-                text = widget.cget("text")
-                if page == "datasource" and "已保存的数据源" in text:
-                    return widget
-                if page == "template" and "已保存的模板" in text:
-                    return widget
-                if page == "mapping" and "已有映射配置" in text:
-                    return widget
-        return None
+        """找到指定页面的列表frame（递归查找）"""
+        target_texts = {
+            "datasource": "已保存的数据源",
+            "template": "已保存的模板",
+            "mapping": "已有映射配置"
+        }
+        target = target_texts.get(page, "")
+        if not target:
+            return None
+
+        def find_recursive(parent):
+            for widget in parent.winfo_children():
+                if isinstance(widget, ttk.LabelFrame):
+                    if target in widget.cget("text"):
+                        return widget
+                # 递归查找子widget
+                result = find_recursive(widget)
+                if result:
+                    return result
+            return None
+
+        return find_recursive(self.current_page)
 
     # ==================== 模板管理页面 ====================
 
