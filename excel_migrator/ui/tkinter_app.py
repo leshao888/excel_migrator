@@ -605,9 +605,6 @@ class ExcelMigratorApp:
         ttk.Label(info_frame, text="配置名称:").grid(row=0, column=0, sticky=W, padx=5, pady=5)
         ttk.Label(info_frame, text=config_item.name, bootstyle="info").grid(row=0, column=1, sticky=W, padx=5, pady=5)
 
-        ttk.Label(info_frame, text="存储位置:").grid(row=0, column=2, sticky=W, padx=5, pady=5)
-        ttk.Label(info_frame, text="storage/mapping_configs.json", bootstyle="secondary").grid(row=0, column=3, sticky=W, padx=5, pady=5)
-
         # 映射列表
         mappings_frame = ttk.LabelFrame(main_frame, text="映射列表")
         mappings_frame.pack(fill=BOTH, expand=True, pady=5)
