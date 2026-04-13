@@ -605,7 +605,7 @@ class ExcelMigratorApp:
         """打开映射配置编辑器"""
         dialog = tk.Toplevel(self.root)
         dialog.title(f"编辑映射配置")
-        dialog.geometry("1000x700")
+        dialog.geometry("1100x750")
         dialog.transient(self.root)
 
         # 存储当前是否放大状态
@@ -614,19 +614,24 @@ class ExcelMigratorApp:
         main_frame = ttk.Frame(dialog)
         main_frame.pack(fill=BOTH, expand=True, padx=10, pady=10)
 
+        # 顶部按钮栏
+        top_btn_frame = ttk.Frame(main_frame)
+        top_btn_frame.pack(fill=X, pady=(0, 5))
+
         # 放大/缩小按钮
         def toggle_expand():
             if is_expanded["value"]:
-                dialog.geometry("1000x700")
+                dialog.geometry("1100x750")
                 toggle_btn.config(text="🔍 放大")
                 is_expanded["value"] = False
             else:
-                dialog.geometry("1200x900")
+                # 最大化窗口
+                dialog.state('zoomed')
                 toggle_btn.config(text="🔍 缩小")
                 is_expanded["value"] = True
 
-        toggle_btn = ttk.Button(main_frame, text="🔍 放大", command=toggle_expand, bootstyle="info")
-        toggle_btn.pack(anchor=E, pady=(0, 5))
+        toggle_btn = ttk.Button(top_btn_frame, text="🔍 放大", command=toggle_expand, bootstyle="info")
+        toggle_btn.pack(side=LEFT, padx=5)
 
         # 基本信息（名称只读）
         info_frame = ttk.LabelFrame(main_frame, text="基本信息")
@@ -653,7 +658,7 @@ class ExcelMigratorApp:
         mappings_frame.pack(fill=BOTH, expand=True, pady=5)
 
         # 创建带滚动条的canvas
-        canvas = tk.Canvas(mappings_frame)
+        canvas = tk.Canvas(mappings_frame, highlightthickness=0)
         scrollbar = ttk.Scrollbar(mappings_frame, orient="vertical", command=canvas.yview)
         scrollable = ttk.Frame(canvas)
 
@@ -661,7 +666,13 @@ class ExcelMigratorApp:
         canvas.create_window((0, 0), window=scrollable, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
 
+        # 鼠标滚轮支持
+        def on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        canvas.bind_all("<MouseWheel>", on_mousewheel)
+
         mapping_vars = []
+        mapping_frames = []
 
         # 数据源和模板列表
         data_sources = self.store.load_data_sources()
@@ -681,44 +692,59 @@ class ExcelMigratorApp:
                     return t
             return None
 
-        for i, mapping in enumerate(config_item.config.sheet_mappings):
-            mf = ttk.LabelFrame(scrollable, text=f"映射 {i+1}")
+        # 创建单个映射控件
+        def create_mapping_frame(parent, index, mapping=None):
+            mf = ttk.LabelFrame(parent, text=f"映射 {index + 1}")
             mf.pack(fill=X, pady=5, padx=5)
 
-            mv = {"index": i}
+            mv = {"index": index, "frame": mf}
 
-            # 找到当前选中的数据源和模板
+            # 如果没有传入mapping，使用默认值
+            if mapping is None:
+                mapping = type('Mapping', (), {
+                    'data_source_sheet': '',
+                    'template_file': templates[0].name if templates else '',
+                    'template_sheet': '',
+                    'copy_rule': type('Rule', (), {
+                        'source_start': 'A1',
+                        'target_start': 'A1',
+                        'direction': 'horizontal',
+                        'length': 10
+                    })()
+                })()
+
             current_ds = find_ds_by_sheet(mapping.data_source_sheet)
             current_tmpl = find_tmpl_by_file(mapping.template_file)
 
+            # 删除按钮
+            def delete_this():
+                mf.destroy()
+                mapping_vars[:] = [v for v in mapping_vars if v.get("frame") != mf]
+                # 重新编号
+                for i, v in enumerate(mapping_vars):
+                    v["frame"].configure(text=f"映射 {i + 1}")
+                mapping_vars[:] = [dict(list(v.items()) + [("index", i)]) if "index" in v else v for i, v in enumerate(mapping_vars)]
+
+            del_btn = ttk.Button(mf, text="🗑️ 删除", command=delete_this, bootstyle="danger")
+            del_btn.pack(side=RIGHT, anchor=NE, padx=5, pady=2)
+
             # 行0: 数据源选择
-            ttk.Label(mf, text="数据源:").grid(row=0, column=0, sticky=W, padx=2, pady=2)
+            row0_frame = ttk.Frame(mf)
+            row0_frame.pack(fill=X, pady=2)
+
+            ttk.Label(row0_frame, text="数据源:").pack(side=LEFT, padx=(0, 2))
             mv["ds"] = tk.StringVar(value=current_ds.name if current_ds else "")
-            ds_combo = ttk.Combobox(mf, values=[ds.name for ds in data_sources],
+            ds_combo = ttk.Combobox(row0_frame, values=[ds.name for ds in data_sources],
                                     textvariable=mv["ds"], width=20, state="readonly")
-            ds_combo.grid(row=0, column=1, sticky=W, padx=2, pady=2)
+            ds_combo.pack(side=LEFT, padx=2)
 
-            # 行0: 数据源Sheet选择
-            ttk.Label(mf, text="Sheet:").grid(row=0, column=2, sticky=W, padx=2, pady=2)
+            ttk.Label(row0_frame, text="Sheet:").pack(side=LEFT, padx=(10, 2))
             mv["ds_sheet"] = tk.StringVar(value=mapping.data_source_sheet)
-            ds_sheet_combo = ttk.Combobox(mf, values=current_ds.sheets if current_ds else [],
+            ds_sheet_combo = ttk.Combobox(row0_frame, values=current_ds.sheets if current_ds else [],
                                            textvariable=mv["ds_sheet"], width=15, state="readonly")
-            ds_sheet_combo.grid(row=0, column=3, sticky=W, padx=2, pady=2)
+            ds_sheet_combo.pack(side=LEFT, padx=2)
 
-            # 数据源Sheet下拉根据数据源变化
-            def on_ds_change(event, idx=i):
-                ds_name = mapping_vars[idx]["ds"].get()
-                ds = next((d for d in data_sources if d.name == ds_name), None)
-                if ds:
-                    mapping_vars[idx]["ds_sheet"].set("")
-                    # 找到对应的combobox并更新
-                    for child in scrollable.winfo_children():
-                        if isinstance(child, ttk.LabelFrame):
-                            for widget in child.winfo_children():
-                                if isinstance(widget, ttk.Combobox) and widget == mapping_vars[idx].get("ds_sheet_combo"):
-                                    pass  # will be updated below
-
-            def update_ds_sheets(event, idx=i, combo=ds_sheet_combo):
+            def update_ds_sheets_combo(idx, combo, *args):
                 ds_name = mapping_vars[idx]["ds"].get()
                 ds = next((d for d in data_sources if d.name == ds_name), None)
                 if ds:
@@ -726,24 +752,25 @@ class ExcelMigratorApp:
                     if mapping_vars[idx]["ds_sheet"].get() not in ds.sheets:
                         mapping_vars[idx]["ds_sheet"].set(ds.sheets[0] if ds.sheets else "")
 
-            ds_combo.bind("<<ComboboxSelected>>", lambda e, idx=i, combo=ds_sheet_combo: update_ds_sheets(e, idx, combo))
-            mv["ds_sheet_combo"] = ds_sheet_combo
+            ds_combo.bind("<<ComboboxSelected>>", lambda e, idx=index, combo=ds_sheet_combo: update_ds_sheets_combo(idx, combo))
 
-            # 行1: 模板文件选择
-            ttk.Label(mf, text="模板文件:").grid(row=1, column=0, sticky=W, padx=2, pady=2)
+            # 行1: 模板选择
+            row1_frame = ttk.Frame(mf)
+            row1_frame.pack(fill=X, pady=2)
+
+            ttk.Label(row1_frame, text="模板文件:").pack(side=LEFT, padx=(0, 2))
             mv["template"] = tk.StringVar(value=mapping.template_file)
-            t_combo = ttk.Combobox(mf, values=[os.path.basename(t.file_path) for t in templates],
-                                   textvariable=mv["template"], width=20, state="readonly")
-            t_combo.grid(row=1, column=1, sticky=W, padx=2, pady=2)
+            t_combo = ttk.Combobox(row1_frame, values=[os.path.basename(t.file_path) for t in templates],
+                                   textvariable=mv["template"], width=25, state="readonly")
+            t_combo.pack(side=LEFT, padx=2)
 
-            # 行1: 模板Sheet选择
-            ttk.Label(mf, text="模板Sheet:").grid(row=1, column=2, sticky=W, padx=2, pady=2)
+            ttk.Label(row1_frame, text="模板Sheet:").pack(side=LEFT, padx=(10, 2))
             mv["template_sheet"] = tk.StringVar(value=mapping.template_sheet)
-            t_sheet_combo = ttk.Combobox(mf, values=current_tmpl.sheets if current_tmpl else [],
+            t_sheet_combo = ttk.Combobox(row1_frame, values=current_tmpl.sheets if current_tmpl else [],
                                          textvariable=mv["template_sheet"], width=15, state="readonly")
-            t_sheet_combo.grid(row=1, column=3, sticky=W, padx=2, pady=2)
+            t_sheet_combo.pack(side=LEFT, padx=2)
 
-            def update_template_sheets(event, idx=i, combo=t_sheet_combo):
+            def update_template_sheets_combo(idx, combo, *args):
                 t_name = mapping_vars[idx]["template"].get()
                 t = find_tmpl_by_file(t_name)
                 if t:
@@ -751,45 +778,71 @@ class ExcelMigratorApp:
                     if mapping_vars[idx]["template_sheet"].get() not in t.sheets:
                         mapping_vars[idx]["template_sheet"].set(t.sheets[0] if t.sheets else "")
 
-            t_combo.bind("<<ComboboxSelected>>", lambda e, idx=i, combo=t_sheet_combo: update_template_sheets(e, idx, combo))
-            mv["template_sheet_combo"] = t_sheet_combo
+            t_combo.bind("<<ComboboxSelected>>", lambda e, idx=index, combo=t_sheet_combo: update_template_sheets_combo(idx, combo))
 
             # 行2: 源起始和目标起始（使用大文本框）
-            ttk.Label(mf, text="源起始:").grid(row=2, column=0, sticky=W, padx=2, pady=2)
+            row2_frame = ttk.Frame(mf)
+            row2_frame.pack(fill=X, pady=2)
+
+            ttk.Label(row2_frame, text="源起始:").pack(side=LEFT, padx=(0, 2))
             src_val = ", ".join(mapping.copy_rule.source_start) if isinstance(mapping.copy_rule.source_start, list) else mapping.copy_rule.source_start
-            src_text = scrolledtext.ScrolledText(mf, width=25, height=3, wrap=tk.WORD)
+            src_text = scrolledtext.ScrolledText(row2_frame, width=35, height=3, wrap=tk.WORD)
             src_text.insert("1.0", src_val)
-            src_text.grid(row=2, column=1, sticky=W, padx=2, pady=2)
+            src_text.pack(side=LEFT, padx=2, fill=X, expand=True)
             mv["source_start"] = src_text
 
-            ttk.Label(mf, text="目标起始:").grid(row=2, column=2, sticky=W, padx=2, pady=2)
+            ttk.Label(row2_frame, text="目标起始:").pack(side=LEFT, padx=(10, 2))
             tgt_val = ", ".join(mapping.copy_rule.target_start) if isinstance(mapping.copy_rule.target_start, list) else mapping.copy_rule.target_start
-            tgt_text = scrolledtext.ScrolledText(mf, width=25, height=3, wrap=tk.WORD)
+            tgt_text = scrolledtext.ScrolledText(row2_frame, width=35, height=3, wrap=tk.WORD)
             tgt_text.insert("1.0", tgt_val)
-            tgt_text.grid(row=2, column=3, sticky=W, padx=2, pady=2)
+            tgt_text.pack(side=LEFT, padx=2, fill=X, expand=True)
             mv["target_start"] = tgt_text
 
             # 行3: 方向和长度
-            ttk.Label(mf, text="方向:").grid(row=3, column=0, sticky=W, padx=2, pady=2)
+            row3_frame = ttk.Frame(mf)
+            row3_frame.pack(fill=X, pady=2)
+
+            ttk.Label(row3_frame, text="方向:").pack(side=LEFT, padx=(0, 2))
             mv["direction"] = tk.StringVar(value=mapping.copy_rule.direction.value)
-            ttk.Combobox(mf, values=["horizontal", "vertical"], textvariable=mv["direction"], width=20, state="readonly").grid(row=3, column=1, sticky=W, padx=2, pady=2)
+            ttk.Combobox(row3_frame, values=["horizontal", "vertical"], textvariable=mv["direction"], width=12, state="readonly").pack(side=LEFT, padx=2)
 
-            ttk.Label(mf, text="长度:").grid(row=3, column=2, sticky=W, padx=2, pady=2)
+            ttk.Label(row3_frame, text="长度:").pack(side=LEFT, padx=(10, 2))
             mv["length"] = tk.IntVar(value=mapping.copy_rule.length)
-            ttk.Entry(mf, textvariable=mv["length"], width=22).grid(row=3, column=3, sticky=W, padx=2, pady=2)
+            ttk.Entry(row3_frame, textvariable=mv["length"], width=10).pack(side=LEFT, padx=2)
 
+            return mv
+
+        # 创建已有的映射
+        for i, mapping in enumerate(config_item.config.sheet_mappings):
+            mv = create_mapping_frame(scrollable, i, mapping)
             mapping_vars.append(mv)
+
+        # 新增映射按钮
+        def add_new_mapping():
+            idx = len(mapping_vars)
+            mv = create_mapping_frame(scrollable, idx)
+            mapping_vars.append(mv)
+            # 滚动到底部
+            dialog.update_idletasks()
+            canvas.yview_moveto(1.0)
+
+        add_btn_frame = ttk.Frame(mappings_frame)
+        add_btn_frame.pack(fill=X, pady=5)
+
+        ttk.Button(add_btn_frame, text="➕ 添加映射", command=add_new_mapping, bootstyle="success").pack(side=LEFT, padx=5)
 
         canvas.pack(side=LEFT, fill=BOTH, expand=True)
         scrollbar.pack(side=RIGHT, fill=Y)
 
-        # 按钮
+        # 底部按钮
         btn_frame = ttk.Frame(dialog)
         btn_frame.pack(fill=X, pady=10)
 
         def do_save():
             sheet_mappings = []
             for mv in mapping_vars:
+                if "ds_sheet" not in mv:  # 跳过已删除的
+                    continue
                 # 规范化输入：处理全角逗号、中文逗号等
                 # 从大文本框获取内容
                 src = normalize_list_string(mv["source_start"].get("1.0", tk.END).strip())
@@ -836,6 +889,18 @@ class ExcelMigratorApp:
             messagebox.showinfo("成功", "保存成功")
             dialog.destroy()
             self._refresh_mapping_list(self._find_list_frame("mapping"))
+
+        ttk.Button(btn_frame, text="💾 保存", bootstyle="success", command=do_save).pack(side=LEFT, padx=5)
+        ttk.Button(btn_frame, text="取消", command=dialog.destroy).pack(side=LEFT)
+
+        # 窗口关闭时解绑鼠标滚轮事件
+        def on_dialog_close():
+            try:
+                canvas.unbind_all("<MouseWheel>")
+            except:
+                pass
+            dialog.destroy()
+        dialog.protocol("WM_DELETE_WINDOW", on_dialog_close)
 
         ttk.Button(btn_frame, text="💾 保存", bootstyle="success", command=do_save).pack(side=LEFT, padx=5)
         ttk.Button(btn_frame, text="取消", command=dialog.destroy).pack(side=LEFT)
