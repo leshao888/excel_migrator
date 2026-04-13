@@ -671,34 +671,12 @@ class ExcelMigratorApp:
         dialog.state('zoomed')  # 最大化打开
         dialog.transient(self.root)
 
-        # 存储当前是否放大状态
-        is_expanded = {"value": True}
-
         # 获取屏幕尺寸
         screen_w = dialog.winfo_screenwidth()
         screen_h = dialog.winfo_screenheight()
 
         main_frame = ttk.Frame(dialog)
         main_frame.pack(fill=BOTH, expand=True, padx=15, pady=10)
-
-        # 顶部按钮栏
-        top_btn_frame = ttk.Frame(main_frame)
-        top_btn_frame.pack(fill=X, pady=(0, 10))
-
-        # 放大/缩小按钮
-        def toggle_expand():
-            if is_expanded["value"]:
-                dialog.state('normal')
-                dialog.geometry(f"{int(screen_w*0.8)}x{int(screen_h*0.8)}")
-                toggle_btn.config(text="🔍 放大")
-                is_expanded["value"] = False
-            else:
-                dialog.state('zoomed')
-                toggle_btn.config(text="🔍 缩小")
-                is_expanded["value"] = True
-
-        toggle_btn = ttk.Button(top_btn_frame, text="🔍 缩小", command=toggle_expand, bootstyle="info")
-        toggle_btn.pack(side=LEFT, padx=5)
 
         # 基本信息（名称只读）
         info_frame = ttk.LabelFrame(main_frame, text="基本信息")
@@ -719,6 +697,7 @@ class ExcelMigratorApp:
             font=("Microsoft YaHei", 11)
         )
         write_mode_combo.grid(row=0, column=3, sticky=W, padx=10, pady=8)
+        write_mode_combo.bind("<MouseWheel>", lambda e: "break")
         ttk.Label(info_frame, text="(skip:只写空行, overwrite:直接覆盖)", bootstyle="secondary", font=("Microsoft YaHei", 9)).grid(row=0, column=4, sticky=W, padx=10, pady=8)
 
         # 映射列表
@@ -734,14 +713,16 @@ class ExcelMigratorApp:
         canvas.create_window((0, 0), window=scrollable, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
 
-        # 鼠标滚轮支持
+        # 鼠标滚轮支持 - 只在canvas上滚动，不影响下拉框
         def on_mousewheel(event):
             try:
                 if canvas.winfo_exists():
                     canvas.yview_scroll(int(-1*(event.delta/120)), "units")
             except:
                 pass
-        canvas.bind_all("<MouseWheel>", on_mousewheel)
+
+        # 在canvas上绑定滚轮事件，不使用bind_all避免影响下拉框
+        canvas.bind("<MouseWheel>", on_mousewheel)
 
         mapping_vars = []
 
@@ -796,93 +777,121 @@ class ExcelMigratorApp:
                     v["frame"].configure(text=f"映射 {i + 1}")
                 mapping_vars[:] = [dict(list(v.items()) + [("index", i)]) if "index" in v else v for i, v in enumerate(mapping_vars)]
 
-            del_btn = ttk.Button(mf, text="🗑️ 删除", command=delete_this, bootstyle="danger", font=("Microsoft YaHei", 10))
+            del_btn = ttk.Button(mf, text="🗑️ 删除", command=delete_this, bootstyle="danger")
             del_btn.pack(side=RIGHT, anchor=NE, padx=8, pady=5)
 
-            # 行0: 数据源选择
+            # 阻止下拉框的滚轮事件冒泡到canvas
+            def stop_propagation(event):
+                return "break"
+
+            # 行0: 数据源选择 - 使用grid布局让下拉框自动扩展
             row0_frame = ttk.Frame(mf)
             row0_frame.pack(fill=X, pady=5)
+            row0_frame.columnconfigure(1, weight=1)
+            row0_frame.columnconfigure(3, weight=1)
 
-            ttk.Label(row0_frame, text="数据源:", font=("Microsoft YaHei", 10)).pack(side=LEFT, padx=(0, 5))
+            ttk.Label(row0_frame, text="数据源:", font=("Microsoft YaHei", 10)).grid(row=0, column=0, sticky=W, padx=(5, 2))
             mv["ds"] = tk.StringVar(value=current_ds.name if current_ds else "")
-            # 加宽数据源下拉框
             ds_combo = ttk.Combobox(row0_frame, values=[ds.name for ds in data_sources],
-                                    textvariable=mv["ds"], width=35, state="readonly", font=("Microsoft YaHei", 10))
-            ds_combo.pack(side=LEFT, padx=5)
+                                    textvariable=mv["ds"], state="readonly", font=("Microsoft YaHei", 10))
+            ds_combo.grid(row=0, column=1, sticky=EW, padx=5)
 
-            ttk.Label(row0_frame, text="Sheet:", font=("Microsoft YaHei", 10)).pack(side=LEFT, padx=(15, 5))
+            ttk.Label(row0_frame, text="Sheet:", font=("Microsoft YaHei", 10)).grid(row=0, column=2, sticky=W, padx=(10, 2))
             mv["ds_sheet"] = tk.StringVar(value=mapping.data_source_sheet)
             ds_sheet_combo = ttk.Combobox(row0_frame, values=current_ds.sheets if current_ds else [],
-                                           textvariable=mv["ds_sheet"], width=25, state="readonly", font=("Microsoft YaHei", 10))
-            ds_sheet_combo.pack(side=LEFT, padx=5)
+                                           textvariable=mv["ds_sheet"], state="readonly", font=("Microsoft YaHei", 10))
+            ds_sheet_combo.grid(row=0, column=3, sticky=EW, padx=5)
+            ds_sheet_combo.bind("<MouseWheel>", stop_propagation)
 
-            def update_ds_sheets_combo(idx, combo, *args):
-                ds_name = mapping_vars[idx]["ds"].get()
+            def update_ds_sheets_combo(combo, *args):
+                # 使用combo直接获取数据源名称，不需要索引
+                ds_name = combo.get()
                 ds = next((d for d in data_sources if d.name == ds_name), None)
                 if ds:
                     combo["values"] = ds.sheets
-                    if mapping_vars[idx]["ds_sheet"].get() not in ds.sheets:
-                        mapping_vars[idx]["ds_sheet"].set(ds.sheets[0] if ds.sheets else "")
+                    # 找到对应的mv条目来更新ds_sheet
+                    for mv in mapping_vars:
+                        if mv["ds"].get() == ds_name:
+                            if mv["ds_sheet"].get() not in ds.sheets:
+                                mv["ds_sheet"].set(ds.sheets[0] if ds.sheets else "")
+                            break
 
-            ds_combo.bind("<<ComboboxSelected>>", lambda e, idx=index, combo=ds_sheet_combo: update_ds_sheets_combo(idx, combo))
+            ds_combo.bind("<MouseWheel>", stop_propagation)
+            ds_combo.bind("<<ComboboxSelected>>", lambda e, combo=ds_sheet_combo: update_ds_sheets_combo(combo))
 
             # 行1: 模板选择
             row1_frame = ttk.Frame(mf)
             row1_frame.pack(fill=X, pady=5)
+            row1_frame.columnconfigure(1, weight=1)
+            row1_frame.columnconfigure(3, weight=1)
 
-            ttk.Label(row1_frame, text="模板文件:", font=("Microsoft YaHei", 10)).pack(side=LEFT, padx=(0, 5))
+            ttk.Label(row1_frame, text="模板文件:", font=("Microsoft YaHei", 10)).grid(row=0, column=0, sticky=W, padx=(5, 2))
             mv["template"] = tk.StringVar(value=mapping.template_file)
-            # 加宽模板文件下拉框
             t_combo = ttk.Combobox(row1_frame, values=[os.path.basename(t.file_path) for t in templates],
-                                   textvariable=mv["template"], width=40, state="readonly", font=("Microsoft YaHei", 10))
-            t_combo.pack(side=LEFT, padx=5)
+                                   textvariable=mv["template"], state="readonly", font=("Microsoft YaHei", 10))
+            t_combo.grid(row=0, column=1, sticky=EW, padx=5)
 
-            ttk.Label(row1_frame, text="模板Sheet:", font=("Microsoft YaHei", 10)).pack(side=LEFT, padx=(15, 5))
+            ttk.Label(row1_frame, text="模板Sheet:", font=("Microsoft YaHei", 10)).grid(row=0, column=2, sticky=W, padx=(10, 2))
             mv["template_sheet"] = tk.StringVar(value=mapping.template_sheet)
             t_sheet_combo = ttk.Combobox(row1_frame, values=current_tmpl.sheets if current_tmpl else [],
-                                         textvariable=mv["template_sheet"], width=25, state="readonly", font=("Microsoft YaHei", 10))
-            t_sheet_combo.pack(side=LEFT, padx=5)
+                                         textvariable=mv["template_sheet"], state="readonly", font=("Microsoft YaHei", 10))
+            t_sheet_combo.grid(row=0, column=3, sticky=EW, padx=5)
+            t_sheet_combo.bind("<MouseWheel>", stop_propagation)
 
-            def update_template_sheets_combo(idx, combo, *args):
-                t_name = mapping_vars[idx]["template"].get()
+            def update_template_sheets_combo(combo, *args):
+                # 使用combo直接获取模板名称，不需要索引
+                t_name = combo.get()
                 t = find_tmpl_by_file(t_name)
                 if t:
                     combo["values"] = t.sheets
-                    if mapping_vars[idx]["template_sheet"].get() not in t.sheets:
-                        mapping_vars[idx]["template_sheet"].set(t.sheets[0] if t.sheets else "")
+                    # 找到对应的mv条目来更新template_sheet
+                    for mv in mapping_vars:
+                        if mv["template"].get() == t_name:
+                            if mv["template_sheet"].get() not in t.sheets:
+                                mv["template_sheet"].set(t.sheets[0] if t.sheets else "")
+                            break
 
-            t_combo.bind("<<ComboboxSelected>>", lambda e, idx=index, combo=t_sheet_combo: update_template_sheets_combo(idx, combo))
+            t_combo.bind("<MouseWheel>", stop_propagation)
+            t_combo.bind("<<ComboboxSelected>>", lambda e, combo=t_sheet_combo: update_template_sheets_combo(combo))
 
-            # 行2: 源起始和目标起始（使用大文本框）
+            # 行2: 源起始和目标起始（使用grid布局让文本框自动扩展）
             row2_frame = ttk.Frame(mf)
             row2_frame.pack(fill=X, pady=5)
+            row2_frame.columnconfigure(1, weight=1)
+            row2_frame.columnconfigure(3, weight=1)
 
-            ttk.Label(row2_frame, text="源起始:", font=("Microsoft YaHei", 10)).pack(side=LEFT, padx=(0, 5))
+            ttk.Label(row2_frame, text="源起始:", font=("Microsoft YaHei", 10)).grid(row=0, column=0, sticky=W, padx=(5, 2))
             src_val = ", ".join(mapping.copy_rule.source_start) if isinstance(mapping.copy_rule.source_start, list) else mapping.copy_rule.source_start
             # 增大文本框
-            src_text = scrolledtext.ScrolledText(row2_frame, width=50, height=4, wrap=tk.WORD, font=("Consolas", 10))
+            src_text = scrolledtext.ScrolledText(row2_frame, height=4, wrap=tk.WORD, font=("Consolas", 10))
             src_text.insert("1.0", src_val)
-            src_text.pack(side=LEFT, padx=5, fill=X, expand=True)
+            src_text.grid(row=0, column=1, sticky=EW, padx=5)
             mv["source_start"] = src_text
 
-            ttk.Label(row2_frame, text="目标起始:", font=("Microsoft YaHei", 10)).pack(side=LEFT, padx=(15, 5))
+            ttk.Label(row2_frame, text="目标起始:", font=("Microsoft YaHei", 10)).grid(row=0, column=2, sticky=W, padx=(10, 2))
             tgt_val = ", ".join(mapping.copy_rule.target_start) if isinstance(mapping.copy_rule.target_start, list) else mapping.copy_rule.target_start
-            tgt_text = scrolledtext.ScrolledText(row2_frame, width=50, height=4, wrap=tk.WORD, font=("Consolas", 10))
+            tgt_text = scrolledtext.ScrolledText(row2_frame, height=4, wrap=tk.WORD, font=("Consolas", 10))
             tgt_text.insert("1.0", tgt_val)
-            tgt_text.pack(side=LEFT, padx=5, fill=X, expand=True)
+            tgt_text.grid(row=0, column=3, sticky=EW, padx=5)
             mv["target_start"] = tgt_text
 
-            # 行3: 方向和长度
+            # 行3: 方向和长度（使用grid布局）
             row3_frame = ttk.Frame(mf)
             row3_frame.pack(fill=X, pady=5)
+            row3_frame.columnconfigure(1, weight=0)
+            row3_frame.columnconfigure(3, weight=0)
 
-            ttk.Label(row3_frame, text="方向:", font=("Microsoft YaHei", 10)).pack(side=LEFT, padx=(0, 5))
-            mv["direction"] = tk.StringVar(value=mapping.copy_rule.direction.value)
-            ttk.Combobox(row3_frame, values=["horizontal", "vertical"], textvariable=mv["direction"], width=15, state="readonly", font=("Microsoft YaHei", 10)).pack(side=LEFT, padx=5)
+            ttk.Label(row3_frame, text="方向:", font=("Microsoft YaHei", 10)).grid(row=0, column=0, sticky=W, padx=(5, 2))
+            # 处理direction可能是字符串或Direction枚举的情况
+            dir_value = mapping.copy_rule.direction.value if hasattr(mapping.copy_rule.direction, 'value') else mapping.copy_rule.direction
+            mv["direction"] = tk.StringVar(value=dir_value)
+            dir_combo = ttk.Combobox(row3_frame, values=["horizontal", "vertical"], textvariable=mv["direction"], width=15, state="readonly", font=("Microsoft YaHei", 10))
+            dir_combo.grid(row=0, column=1, sticky=W, padx=5)
+            dir_combo.bind("<MouseWheel>", stop_propagation)
 
-            ttk.Label(row3_frame, text="长度:", font=("Microsoft YaHei", 10)).pack(side=LEFT, padx=(15, 5))
+            ttk.Label(row3_frame, text="长度:", font=("Microsoft YaHei", 10)).grid(row=0, column=2, sticky=W, padx=(10, 2))
             mv["length"] = tk.IntVar(value=mapping.copy_rule.length)
-            ttk.Entry(row3_frame, textvariable=mv["length"], width=12, font=("Microsoft YaHei", 10)).pack(side=LEFT, padx=5)
+            ttk.Entry(row3_frame, textvariable=mv["length"], width=12, font=("Microsoft YaHei", 10)).grid(row=0, column=3, sticky=W, padx=5)
 
             return mv
 
@@ -903,14 +912,10 @@ class ExcelMigratorApp:
         add_btn_frame = ttk.Frame(mappings_frame)
         add_btn_frame.pack(fill=X, pady=10)
 
-        ttk.Button(add_btn_frame, text="➕ 添加映射", command=add_new_mapping, bootstyle="success", font=("Microsoft YaHei", 11)).pack(side=LEFT, padx=10)
+        ttk.Button(add_btn_frame, text="➕ 添加映射", command=add_new_mapping, bootstyle="success").pack(side=LEFT, padx=10)
 
         canvas.pack(side=LEFT, fill=BOTH, expand=True)
         scrollbar.pack(side=RIGHT, fill=Y)
-
-        # 底部按钮 - 放在主窗口底部，确保可见
-        btn_frame = ttk.Frame(dialog)
-        btn_frame.pack(fill=X, pady=15)
 
         def do_save():
             sheet_mappings = []
@@ -964,24 +969,12 @@ class ExcelMigratorApp:
             dialog.destroy()
             self._refresh_mapping_list(self._find_list_frame("mapping"))
 
-        # 放大按钮和保存/取消按钮放在同一行
-        toggle_btn2 = ttk.Button(btn_frame, text="🔍 缩小", command=toggle_expand, bootstyle="info", font=("Microsoft YaHei", 11))
-        toggle_btn2.pack(side=LEFT, padx=10)
+        # 底部按钮 - 使用grid布局确保始终可见
+        btn_frame = ttk.Frame(dialog)
+        btn_frame.pack(fill=X, pady=15, padx=15, side=BOTTOM)
 
-        ttk.Button(btn_frame, text="💾 保存", bootstyle="success", command=do_save, font=("Microsoft YaHei", 11)).pack(side=RIGHT, padx=10)
-        ttk.Button(btn_frame, text="取消", command=dialog.destroy, font=("Microsoft YaHei", 11)).pack(side=RIGHT, padx=10)
-
-        # 窗口关闭时解绑鼠标滚轮事件
-        def on_dialog_close():
-            try:
-                canvas.unbind_all("<MouseWheel>")
-            except:
-                pass
-            dialog.destroy()
-        dialog.protocol("WM_DELETE_WINDOW", on_dialog_close)
-
-        ttk.Button(btn_frame, text="💾 保存", bootstyle="success", command=do_save).pack(side=LEFT, padx=5)
-        ttk.Button(btn_frame, text="取消", command=dialog.destroy).pack(side=LEFT)
+        ttk.Button(btn_frame, text="💾 保存", bootstyle="success", command=do_save).pack(side=RIGHT, padx=10)
+        ttk.Button(btn_frame, text="取消", command=dialog.destroy).pack(side=RIGHT, padx=10)
 
         # 窗口关闭时解绑鼠标滚轮事件
         def on_dialog_close():
