@@ -621,6 +621,7 @@ class ExcelMigratorApp:
         # 放大/缩小按钮
         def toggle_expand():
             if is_expanded["value"]:
+                dialog.state('normal')
                 dialog.geometry("1100x750")
                 toggle_btn.config(text="🔍 放大")
                 is_expanded["value"] = False
@@ -901,9 +902,6 @@ class ExcelMigratorApp:
                 pass
             dialog.destroy()
         dialog.protocol("WM_DELETE_WINDOW", on_dialog_close)
-
-        ttk.Button(btn_frame, text="💾 保存", bootstyle="success", command=do_save).pack(side=LEFT, padx=5)
-        ttk.Button(btn_frame, text="取消", command=dialog.destroy).pack(side=LEFT)
 
     def _delete_selected_mapping(self):
         """删除选中的映射配置"""
