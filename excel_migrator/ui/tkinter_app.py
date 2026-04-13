@@ -13,7 +13,7 @@ from tkinter import filedialog, messagebox, scrolledtext
 
 from config import STORAGE_DIR, DATA_SOURCES_FILE, TEMPLATES_FILE, MAPPING_CONFIGS_FILE, EXAMPLE_MAPPING_FILENAME, DEFAULT_DIRECTION, DEFAULT_WRITE_MODE
 from storage.store import StorageManager
-from core.models import DataSourceItem, TemplateItem, MappingConfigItem, MappingConfig, SheetMapping, CopyRule
+from core.models import DataSourceItem, TemplateItem, MappingConfigItem, MappingConfig, SheetMapping, CopyRule, CopyResult
 from core.enums import Direction, WriteMode, normalize_string, normalize_list_string
 from core.copier import DataCopier
 from utils.excel_utils import get_sheet_names, load_excel
@@ -671,6 +671,9 @@ class ExcelMigratorApp:
         dialog.state('zoomed')  # 最大化打开
         dialog.transient(self.root)
 
+        # 存储当前是否放大状态
+        is_expanded = {"value": True}
+
         # 获取屏幕尺寸
         screen_w = dialog.winfo_screenwidth()
         screen_h = dialog.winfo_screenheight()
@@ -803,21 +806,17 @@ class ExcelMigratorApp:
             ds_sheet_combo.grid(row=0, column=3, sticky=EW, padx=5)
             ds_sheet_combo.bind("<MouseWheel>", stop_propagation)
 
-            def update_ds_sheets_combo(combo, *args):
-                # 使用combo直接获取数据源名称，不需要索引
-                ds_name = combo.get()
+            def update_ds_sheets_combo(sheet_combo, *args):
+                # 使用mv["ds"]获取当前选中的数据源名称
+                ds_name = mv["ds"].get()
                 ds = next((d for d in data_sources if d.name == ds_name), None)
                 if ds:
-                    combo["values"] = ds.sheets
-                    # 找到对应的mv条目来更新ds_sheet
-                    for mv in mapping_vars:
-                        if mv["ds"].get() == ds_name:
-                            if mv["ds_sheet"].get() not in ds.sheets:
-                                mv["ds_sheet"].set(ds.sheets[0] if ds.sheets else "")
-                            break
+                    sheet_combo["values"] = ds.sheets
+                    if sheet_combo.get() not in ds.sheets:
+                        sheet_combo.set(ds.sheets[0] if ds.sheets else "")
 
             ds_combo.bind("<MouseWheel>", stop_propagation)
-            ds_combo.bind("<<ComboboxSelected>>", lambda e, combo=ds_sheet_combo: update_ds_sheets_combo(combo))
+            ds_combo.bind("<<ComboboxSelected>>", lambda e, sheet_combo=ds_sheet_combo: update_ds_sheets_combo(sheet_combo))
 
             # 行1: 模板选择
             row1_frame = ttk.Frame(mf)
@@ -838,21 +837,17 @@ class ExcelMigratorApp:
             t_sheet_combo.grid(row=0, column=3, sticky=EW, padx=5)
             t_sheet_combo.bind("<MouseWheel>", stop_propagation)
 
-            def update_template_sheets_combo(combo, *args):
-                # 使用combo直接获取模板名称，不需要索引
-                t_name = combo.get()
+            def update_template_sheets_combo(sheet_combo, *args):
+                # 使用mv["template"]获取当前选中的模板名称
+                t_name = mv["template"].get()
                 t = find_tmpl_by_file(t_name)
                 if t:
-                    combo["values"] = t.sheets
-                    # 找到对应的mv条目来更新template_sheet
-                    for mv in mapping_vars:
-                        if mv["template"].get() == t_name:
-                            if mv["template_sheet"].get() not in t.sheets:
-                                mv["template_sheet"].set(t.sheets[0] if t.sheets else "")
-                            break
+                    sheet_combo["values"] = t.sheets
+                    if sheet_combo.get() not in t.sheets:
+                        sheet_combo.set(t.sheets[0] if t.sheets else "")
 
             t_combo.bind("<MouseWheel>", stop_propagation)
-            t_combo.bind("<<ComboboxSelected>>", lambda e, combo=t_sheet_combo: update_template_sheets_combo(combo))
+            t_combo.bind("<<ComboboxSelected>>", lambda e, sheet_combo=t_sheet_combo: update_template_sheets_combo(sheet_combo))
 
             # 行2: 源起始和目标起始（使用grid布局让文本框自动扩展）
             row2_frame = ttk.Frame(mf)
@@ -972,6 +967,21 @@ class ExcelMigratorApp:
         # 底部按钮 - 使用grid布局确保始终可见
         btn_frame = ttk.Frame(dialog)
         btn_frame.pack(fill=X, pady=15, padx=15, side=BOTTOM)
+
+        # 放大/缩小按钮
+        def toggle_expand():
+            if is_expanded["value"]:
+                dialog.state('normal')
+                dialog.geometry(f"{int(screen_w*0.8)}x{int(screen_h*0.8)}")
+                toggle_btn.config(text="🔍 放大")
+                is_expanded["value"] = False
+            else:
+                dialog.state('zoomed')
+                toggle_btn.config(text="🔍 缩小")
+                is_expanded["value"] = True
+
+        toggle_btn = ttk.Button(btn_frame, text="🔍 缩小", command=toggle_expand, bootstyle="info")
+        toggle_btn.pack(side=LEFT, padx=10)
 
         ttk.Button(btn_frame, text="💾 保存", bootstyle="success", command=do_save).pack(side=RIGHT, padx=10)
         ttk.Button(btn_frame, text="取消", command=dialog.destroy).pack(side=RIGHT, padx=10)
@@ -1157,6 +1167,7 @@ class ExcelMigratorApp:
 
             try:
                 all_results = []
+                copied_files = {}  # 记录模板文件路径 -> 实际写入的文件路径
 
                 for t_file, group in template_groups.items():
                     ds = group["ds"]
@@ -1164,10 +1175,22 @@ class ExcelMigratorApp:
                     mappings = group["mappings"]
 
                     if not file_exists(ds.file_path):
-                        result_text.insert(END, f"❌ 数据源文件不存在: {ds.file_path}\n")
+                        for mapping in mappings:
+                            all_results.append(CopyResult(
+                                success=False,
+                                source_sheet=mapping.data_source_sheet,
+                                template_file=t_file,
+                                message=f"数据源文件不存在: {ds.file_path}"
+                            ))
                         continue
                     if not file_exists(t_item.file_path):
-                        result_text.insert(END, f"❌ 模板文件不存在: {t_item.file_path}\n")
+                        for mapping in mappings:
+                            all_results.append(CopyResult(
+                                success=False,
+                                source_sheet=mapping.data_source_sheet,
+                                template_file=t_file,
+                                message=f"模板文件不存在: {t_item.file_path}"
+                            ))
                         continue
 
                     source_wb = load_excel(ds.file_path, data_only=True)
@@ -1178,6 +1201,9 @@ class ExcelMigratorApp:
                         shutil.copy2(t_item.file_path, target_path)
                         result_text.insert(END, f"📁 原始文件被占用，已生成副本: {target_path}\n")
                         result_text.update()
+                        copied_files[t_file] = target_path
+                    else:
+                        copied_files[t_file] = target_path
 
                     target_wb = load_excel(target_path)
                     copier = DataCopier(write_mode=WriteMode.OVERWRITE)
@@ -1192,29 +1218,50 @@ class ExcelMigratorApp:
                 failed = [r for r in all_results if not r.success]
 
                 result_text.insert(END, "="*40 + "\n")
+                success_details = []
                 if success:
                     result_text.insert(END, f"✅ 成功: {len(success)} 个\n")
                     for r in success:
-                        # 显示详细信息
                         ds_name = ""
                         for ds in data_sources:
                             if r.source_sheet in ds.sheets:
                                 ds_name = ds.name
                                 break
+                        actual_path = copied_files.get(r.template_file, r.template_file)
                         result_text.insert(END, f"  - {ds_name} > {r.source_sheet}\n")
                         result_text.insert(END, f"    → {r.message}\n")
+                        result_text.insert(END, f"    📄 {actual_path}\n")
+                        success_details.append((ds_name, r.source_sheet, actual_path, r.message))
+
                 if failed:
-                    result_text.insert(END, f"\n⚠️ 跳过: {len(failed)} 个\n")
+                    result_text.insert(END, f"\n❌ 失败: {len(failed)} 个\n")
                     for r in failed:
                         result_text.insert(END, f"  - {r.source_sheet}: {r.message}\n")
-                result_text.insert(END, f"\n{'='*40}\n总计: {len(all_results)} | 成功: {len(success)} | 跳过: {len(failed)}\n")
+
+                result_text.insert(END, f"\n{'='*40}\n总计: {len(all_results)} | 成功: {len(success)} | 失败: {len(failed)}\n")
+
+                result_text.config(state="disabled")
+
+                # 弹出结果对话框
+                if failed:
+                    # 失败时显示详细错误信息
+                    error_msg = "\n".join([f"• {r.source_sheet}: {r.message}" for r in failed])
+                    messagebox.showerror("迁移结果", f"❌ 迁移完成，但有 {len(failed)} 个失败:\n\n{error_msg}")
+                else:
+                    # 成功时显示成功信息，点击可打开文件
+                    if success_details:
+                        first_file = success_details[0][2]
+                        response = messagebox.askquestion("迁移成功", f"✅ 迁移成功完成!\n\n生成文件: {first_file}\n\n点击【确定】打开文件所在目录，点击【取消】关闭")
+                        if response == 'ok':
+                            import subprocess
+                            subprocess.Popen(f'explorer /select,"{first_file}"')
 
             except PermissionError:
-                result_text.insert("1.0", "⚠️ 文件已打开，请关闭后重试")
+                messagebox.showerror("迁移失败", "⚠️ 文件已打开，请关闭后重试")
+                result_text.config(state="disabled")
             except Exception as e:
-                result_text.insert("1.0", f"❌ 迁移失败: {str(e)}")
-
-            result_text.config(state="disabled")
+                messagebox.showerror("迁移失败", f"❌ 迁移失败: {str(e)}")
+                result_text.config(state="disabled")
 
         ttk.Button(btn_frame, text="🚀 执行迁移", bootstyle="success", command=execute).pack(side=LEFT, padx=5)
 
