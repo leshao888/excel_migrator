@@ -1251,10 +1251,9 @@ class ExcelMigratorApp:
                     # 成功时显示成功信息，点击可打开文件
                     if success_details:
                         first_file = success_details[0][2]
-                        response = messagebox.askquestion("迁移成功", f"✅ 迁移成功完成!\n\n生成文件: {first_file}\n\n点击【确定】打开文件所在目录，点击【取消】关闭")
-                        if response == 'ok':
-                            import subprocess
-                            subprocess.Popen(f'explorer /select,"{first_file}"')
+                        response = messagebox.askyesno("迁移成功", f"✅ 迁移成功完成!\n\n生成文件:\n{first_file}\n\n点击【是】直接打开文件，点击【否】关闭")
+                        if response:
+                            os.startfile(first_file)
 
             except PermissionError:
                 messagebox.showerror("迁移失败", "⚠️ 文件已打开，请关闭后重试")
