@@ -605,11 +605,28 @@ class ExcelMigratorApp:
         """打开映射配置编辑器"""
         dialog = tk.Toplevel(self.root)
         dialog.title(f"编辑映射配置")
-        dialog.geometry("900x600")
+        dialog.geometry("1000x700")
         dialog.transient(self.root)
+
+        # 存储当前是否放大状态
+        is_expanded = {"value": False}
 
         main_frame = ttk.Frame(dialog)
         main_frame.pack(fill=BOTH, expand=True, padx=10, pady=10)
+
+        # 放大/缩小按钮
+        def toggle_expand():
+            if is_expanded["value"]:
+                dialog.geometry("1000x700")
+                toggle_btn.config(text="🔍 放大")
+                is_expanded["value"] = False
+            else:
+                dialog.geometry("1200x900")
+                toggle_btn.config(text="🔍 缩小")
+                is_expanded["value"] = True
+
+        toggle_btn = ttk.Button(main_frame, text="🔍 放大", command=toggle_expand, bootstyle="info")
+        toggle_btn.pack(anchor=E, pady=(0, 5))
 
         # 基本信息（名称只读）
         info_frame = ttk.LabelFrame(main_frame, text="基本信息")
@@ -737,16 +754,20 @@ class ExcelMigratorApp:
             t_combo.bind("<<ComboboxSelected>>", lambda e, idx=i, combo=t_sheet_combo: update_template_sheets(e, idx, combo))
             mv["template_sheet_combo"] = t_sheet_combo
 
-            # 行2: 源起始和目标起始
+            # 行2: 源起始和目标起始（使用大文本框）
             ttk.Label(mf, text="源起始:").grid(row=2, column=0, sticky=W, padx=2, pady=2)
             src_val = ", ".join(mapping.copy_rule.source_start) if isinstance(mapping.copy_rule.source_start, list) else mapping.copy_rule.source_start
-            mv["source_start"] = tk.StringVar(value=src_val)
-            ttk.Entry(mf, textvariable=mv["source_start"], width=22).grid(row=2, column=1, sticky=W, padx=2, pady=2)
+            src_text = scrolledtext.ScrolledText(mf, width=25, height=3, wrap=tk.WORD)
+            src_text.insert("1.0", src_val)
+            src_text.grid(row=2, column=1, sticky=W, padx=2, pady=2)
+            mv["source_start"] = src_text
 
             ttk.Label(mf, text="目标起始:").grid(row=2, column=2, sticky=W, padx=2, pady=2)
             tgt_val = ", ".join(mapping.copy_rule.target_start) if isinstance(mapping.copy_rule.target_start, list) else mapping.copy_rule.target_start
-            mv["target_start"] = tk.StringVar(value=tgt_val)
-            ttk.Entry(mf, textvariable=mv["target_start"], width=22).grid(row=2, column=3, sticky=W, padx=2, pady=2)
+            tgt_text = scrolledtext.ScrolledText(mf, width=25, height=3, wrap=tk.WORD)
+            tgt_text.insert("1.0", tgt_val)
+            tgt_text.grid(row=2, column=3, sticky=W, padx=2, pady=2)
+            mv["target_start"] = tgt_text
 
             # 行3: 方向和长度
             ttk.Label(mf, text="方向:").grid(row=3, column=0, sticky=W, padx=2, pady=2)
@@ -770,8 +791,9 @@ class ExcelMigratorApp:
             sheet_mappings = []
             for mv in mapping_vars:
                 # 规范化输入：处理全角逗号、中文逗号等
-                src = normalize_list_string(mv["source_start"].get().strip())
-                tgt = normalize_list_string(mv["target_start"].get().strip())
+                # 从大文本框获取内容
+                src = normalize_list_string(mv["source_start"].get("1.0", tk.END).strip())
+                tgt = normalize_list_string(mv["target_start"].get("1.0", tk.END).strip())
                 direction = normalize_string(mv["direction"].get())
                 # 长度：取第一个有效数字
                 length_str = normalize_string(str(mv["length"].get()))
