@@ -14,7 +14,7 @@ from tkinter import filedialog, messagebox, scrolledtext
 from config import STORAGE_DIR, DATA_SOURCES_FILE, TEMPLATES_FILE, MAPPING_CONFIGS_FILE, EXAMPLE_MAPPING_FILENAME, DEFAULT_DIRECTION, DEFAULT_WRITE_MODE
 from storage.store import StorageManager
 from core.models import DataSourceItem, TemplateItem, MappingConfigItem, MappingConfig, SheetMapping, CopyRule, CopyResult
-from core.enums import Direction, WriteMode, normalize_string, normalize_list_string
+from core.enums import Direction, WriteMode, normalize_string, normalize_list_string, validate_cell_references, get_supported_separators_display
 from core.copier import DataCopier
 from utils.excel_utils import get_sheet_names, load_excel
 from utils.path_utils import file_exists, is_file_locked
@@ -29,7 +29,7 @@ class ExcelMigratorApp:
 
         # 创建主窗口
         self.root = ttk.Window(themename="cosmo")
-        self.root.title("Excel 数据迁移工具 v1.1")
+        self.root.title("Excel 数据迁移工具 v1.2")
         self.root.geometry("1100x750")
         self.root.minsize(900, 600)
 
@@ -87,7 +87,7 @@ class ExcelMigratorApp:
             self.nav_buttons[page_key] = btn
 
         # 版本信息
-        version_label = ttk.Label(sidebar, text="v1.1", bootstyle="secondary")
+        version_label = ttk.Label(sidebar, text="v1.2", bootstyle="secondary")
         version_label.pack(side=BOTTOM, pady=10)
 
     def _show_page(self, page_key: str):
@@ -110,7 +110,7 @@ class ExcelMigratorApp:
         self.current_page.pack(side=RIGHT, fill=BOTH, expand=True, padx=10, pady=10)
 
     def _show_about(self):
-        messagebox.showinfo("关于", "Excel 数据迁移工具 v1.1\n\n用于 Excel 数据迁移的工具软件")
+        messagebox.showinfo("关于", "Excel 数据迁移工具 v1.2\n\n用于 Excel 数据迁移的工具软件")
 
     # ==================== 数据源管理页面 ====================
 
@@ -917,7 +917,7 @@ class ExcelMigratorApp:
             for mv in mapping_vars:
                 if "ds_sheet" not in mv:  # 跳过已删除的
                     continue
-                # 规范化输入：处理全角逗号、中文逗号等
+                # 规范化输入：处理全角逗号、中文逗号、中文顿号等
                 # 从大文本框获取内容
                 src = normalize_list_string(mv["source_start"].get("1.0", tk.END).strip())
                 tgt = normalize_list_string(mv["target_start"].get("1.0", tk.END).strip())
@@ -928,6 +928,18 @@ class ExcelMigratorApp:
                     length = int(length_str.split(",")[0].strip())
                 except (ValueError, TypeError):
                     length = 10
+
+                # 验证源起始单元格引用
+                is_valid, error_msg = validate_cell_references(src)
+                if not is_valid:
+                    messagebox.showerror("输入错误", f"源起始单元格: {error_msg}\n\n支持的分割符: {get_supported_separators_display()}")
+                    return
+
+                # 验证目标起始单元格引用
+                is_valid, error_msg = validate_cell_references(tgt)
+                if not is_valid:
+                    messagebox.showerror("输入错误", f"目标起始单元格: {error_msg}\n\n支持的分割符: {get_supported_separators_display()}")
+                    return
 
                 sheet_mappings.append({
                     "data_source_sheet": mv["ds_sheet"].get(),
