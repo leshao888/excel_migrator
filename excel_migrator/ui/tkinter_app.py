@@ -29,7 +29,7 @@ class ExcelMigratorApp:
 
         # 创建主窗口
         self.root = ttk.Window(themename="cosmo")
-        self.root.title("Excel 数据迁移工具 v1.0")
+        self.root.title("Excel 数据迁移工具 v1.1")
         self.root.geometry("1100x750")
         self.root.minsize(900, 600)
 
@@ -87,7 +87,7 @@ class ExcelMigratorApp:
             self.nav_buttons[page_key] = btn
 
         # 版本信息
-        version_label = ttk.Label(sidebar, text="v1.0", bootstyle="secondary")
+        version_label = ttk.Label(sidebar, text="v1.1", bootstyle="secondary")
         version_label.pack(side=BOTTOM, pady=10)
 
     def _show_page(self, page_key: str):
@@ -110,7 +110,7 @@ class ExcelMigratorApp:
         self.current_page.pack(side=RIGHT, fill=BOTH, expand=True, padx=10, pady=10)
 
     def _show_about(self):
-        messagebox.showinfo("关于", "Excel 数据迁移工具 v1.0\n\n用于 Excel 数据迁移的工具软件")
+        messagebox.showinfo("关于", "Excel 数据迁移工具 v1.1\n\n用于 Excel 数据迁移的工具软件")
 
     # ==================== 数据源管理页面 ====================
 
