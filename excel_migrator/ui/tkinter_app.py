@@ -667,59 +667,63 @@ class ExcelMigratorApp:
     def _open_mapping_editor(self, config_item):
         """打开映射配置编辑器"""
         dialog = tk.Toplevel(self.root)
-        dialog.title(f"编辑映射配置")
-        dialog.geometry("1100x750")
+        dialog.title(f"编辑映射配置 - {config_item.name}")
+        dialog.state('zoomed')  # 最大化打开
         dialog.transient(self.root)
 
         # 存储当前是否放大状态
-        is_expanded = {"value": False}
+        is_expanded = {"value": True}
+
+        # 获取屏幕尺寸
+        screen_w = dialog.winfo_screenwidth()
+        screen_h = dialog.winfo_screenheight()
 
         main_frame = ttk.Frame(dialog)
-        main_frame.pack(fill=BOTH, expand=True, padx=10, pady=10)
+        main_frame.pack(fill=BOTH, expand=True, padx=15, pady=10)
 
         # 顶部按钮栏
         top_btn_frame = ttk.Frame(main_frame)
-        top_btn_frame.pack(fill=X, pady=(0, 5))
+        top_btn_frame.pack(fill=X, pady=(0, 10))
 
         # 放大/缩小按钮
         def toggle_expand():
             if is_expanded["value"]:
                 dialog.state('normal')
-                dialog.geometry("1100x750")
+                dialog.geometry(f"{int(screen_w*0.8)}x{int(screen_h*0.8)}")
                 toggle_btn.config(text="🔍 放大")
                 is_expanded["value"] = False
             else:
-                # 最大化窗口
                 dialog.state('zoomed')
                 toggle_btn.config(text="🔍 缩小")
                 is_expanded["value"] = True
 
-        toggle_btn = ttk.Button(top_btn_frame, text="🔍 放大", command=toggle_expand, bootstyle="info")
+        toggle_btn = ttk.Button(top_btn_frame, text="🔍 缩小", command=toggle_expand, bootstyle="info")
         toggle_btn.pack(side=LEFT, padx=5)
 
         # 基本信息（名称只读）
         info_frame = ttk.LabelFrame(main_frame, text="基本信息")
-        info_frame.pack(fill=X, pady=5)
+        info_frame.pack(fill=X, pady=10)
 
-        ttk.Label(info_frame, text="配置名称:").grid(row=0, column=0, sticky=W, padx=5, pady=5)
-        ttk.Label(info_frame, text=config_item.name, bootstyle="info").grid(row=0, column=1, sticky=W, padx=5, pady=5)
+        ttk.Label(info_frame, text="配置名称:", font=("Microsoft YaHei", 11)).grid(row=0, column=0, sticky=W, padx=10, pady=8)
+        ttk.Label(info_frame, text=config_item.name, bootstyle="info", font=("Microsoft YaHei", 11)).grid(row=0, column=1, sticky=W, padx=10, pady=8)
 
         # 写入模式选择
-        ttk.Label(info_frame, text="写入模式:").grid(row=0, column=2, sticky=W, padx=5, pady=5)
+        ttk.Label(info_frame, text="写入模式:", font=("Microsoft YaHei", 11)).grid(row=0, column=2, sticky=W, padx=10, pady=8)
         write_mode_var = tk.StringVar(value=config_item.config.write_mode.value)
         write_mode_combo = ttk.Combobox(
             info_frame,
             values=["skip_nonempty", "overwrite"],
             textvariable=write_mode_var,
-            width=15,
-            state="readonly"
+            width=18,
+            state="readonly",
+            font=("Microsoft YaHei", 11)
         )
-        write_mode_combo.grid(row=0, column=3, sticky=W, padx=5, pady=5)
-        ttk.Label(info_frame, text="(skip:只写空行, overwrite:直接覆盖)", bootstyle="secondary").grid(row=0, column=4, sticky=W, padx=5, pady=5)
+        write_mode_combo.grid(row=0, column=3, sticky=W, padx=10, pady=8)
+        ttk.Label(info_frame, text="(skip:只写空行, overwrite:直接覆盖)", bootstyle="secondary", font=("Microsoft YaHei", 9)).grid(row=0, column=4, sticky=W, padx=10, pady=8)
 
         # 映射列表
-        mappings_frame = ttk.LabelFrame(main_frame, text="映射列表")
-        mappings_frame.pack(fill=BOTH, expand=True, pady=5)
+        mappings_frame = ttk.LabelFrame(main_frame, text="映射列表", font=("Microsoft YaHei", 12))
+        mappings_frame.pack(fill=BOTH, expand=True, pady=10)
 
         # 创建带滚动条的canvas
         canvas = tk.Canvas(mappings_frame, highlightthickness=0)
@@ -740,7 +744,6 @@ class ExcelMigratorApp:
         canvas.bind_all("<MouseWheel>", on_mousewheel)
 
         mapping_vars = []
-        mapping_frames = []
 
         # 数据源和模板列表
         data_sources = self.store.load_data_sources()
@@ -762,8 +765,8 @@ class ExcelMigratorApp:
 
         # 创建单个映射控件
         def create_mapping_frame(parent, index, mapping=None):
-            mf = ttk.LabelFrame(parent, text=f"映射 {index + 1}")
-            mf.pack(fill=X, pady=5, padx=5)
+            mf = ttk.LabelFrame(parent, text=f"映射 {index + 1}", font=("Microsoft YaHei", 11, "bold"))
+            mf.pack(fill=X, pady=8, padx=8)
 
             mv = {"index": index, "frame": mf}
 
@@ -793,24 +796,25 @@ class ExcelMigratorApp:
                     v["frame"].configure(text=f"映射 {i + 1}")
                 mapping_vars[:] = [dict(list(v.items()) + [("index", i)]) if "index" in v else v for i, v in enumerate(mapping_vars)]
 
-            del_btn = ttk.Button(mf, text="🗑️ 删除", command=delete_this, bootstyle="danger")
-            del_btn.pack(side=RIGHT, anchor=NE, padx=5, pady=2)
+            del_btn = ttk.Button(mf, text="🗑️ 删除", command=delete_this, bootstyle="danger", font=("Microsoft YaHei", 10))
+            del_btn.pack(side=RIGHT, anchor=NE, padx=8, pady=5)
 
             # 行0: 数据源选择
             row0_frame = ttk.Frame(mf)
-            row0_frame.pack(fill=X, pady=2)
+            row0_frame.pack(fill=X, pady=5)
 
-            ttk.Label(row0_frame, text="数据源:").pack(side=LEFT, padx=(0, 2))
+            ttk.Label(row0_frame, text="数据源:", font=("Microsoft YaHei", 10)).pack(side=LEFT, padx=(0, 5))
             mv["ds"] = tk.StringVar(value=current_ds.name if current_ds else "")
+            # 加宽数据源下拉框
             ds_combo = ttk.Combobox(row0_frame, values=[ds.name for ds in data_sources],
-                                    textvariable=mv["ds"], width=20, state="readonly")
-            ds_combo.pack(side=LEFT, padx=2)
+                                    textvariable=mv["ds"], width=35, state="readonly", font=("Microsoft YaHei", 10))
+            ds_combo.pack(side=LEFT, padx=5)
 
-            ttk.Label(row0_frame, text="Sheet:").pack(side=LEFT, padx=(10, 2))
+            ttk.Label(row0_frame, text="Sheet:", font=("Microsoft YaHei", 10)).pack(side=LEFT, padx=(15, 5))
             mv["ds_sheet"] = tk.StringVar(value=mapping.data_source_sheet)
             ds_sheet_combo = ttk.Combobox(row0_frame, values=current_ds.sheets if current_ds else [],
-                                           textvariable=mv["ds_sheet"], width=15, state="readonly")
-            ds_sheet_combo.pack(side=LEFT, padx=2)
+                                           textvariable=mv["ds_sheet"], width=25, state="readonly", font=("Microsoft YaHei", 10))
+            ds_sheet_combo.pack(side=LEFT, padx=5)
 
             def update_ds_sheets_combo(idx, combo, *args):
                 ds_name = mapping_vars[idx]["ds"].get()
@@ -824,19 +828,20 @@ class ExcelMigratorApp:
 
             # 行1: 模板选择
             row1_frame = ttk.Frame(mf)
-            row1_frame.pack(fill=X, pady=2)
+            row1_frame.pack(fill=X, pady=5)
 
-            ttk.Label(row1_frame, text="模板文件:").pack(side=LEFT, padx=(0, 2))
+            ttk.Label(row1_frame, text="模板文件:", font=("Microsoft YaHei", 10)).pack(side=LEFT, padx=(0, 5))
             mv["template"] = tk.StringVar(value=mapping.template_file)
+            # 加宽模板文件下拉框
             t_combo = ttk.Combobox(row1_frame, values=[os.path.basename(t.file_path) for t in templates],
-                                   textvariable=mv["template"], width=25, state="readonly")
-            t_combo.pack(side=LEFT, padx=2)
+                                   textvariable=mv["template"], width=40, state="readonly", font=("Microsoft YaHei", 10))
+            t_combo.pack(side=LEFT, padx=5)
 
-            ttk.Label(row1_frame, text="模板Sheet:").pack(side=LEFT, padx=(10, 2))
+            ttk.Label(row1_frame, text="模板Sheet:", font=("Microsoft YaHei", 10)).pack(side=LEFT, padx=(15, 5))
             mv["template_sheet"] = tk.StringVar(value=mapping.template_sheet)
             t_sheet_combo = ttk.Combobox(row1_frame, values=current_tmpl.sheets if current_tmpl else [],
-                                         textvariable=mv["template_sheet"], width=15, state="readonly")
-            t_sheet_combo.pack(side=LEFT, padx=2)
+                                         textvariable=mv["template_sheet"], width=25, state="readonly", font=("Microsoft YaHei", 10))
+            t_sheet_combo.pack(side=LEFT, padx=5)
 
             def update_template_sheets_combo(idx, combo, *args):
                 t_name = mapping_vars[idx]["template"].get()
@@ -850,33 +855,34 @@ class ExcelMigratorApp:
 
             # 行2: 源起始和目标起始（使用大文本框）
             row2_frame = ttk.Frame(mf)
-            row2_frame.pack(fill=X, pady=2)
+            row2_frame.pack(fill=X, pady=5)
 
-            ttk.Label(row2_frame, text="源起始:").pack(side=LEFT, padx=(0, 2))
+            ttk.Label(row2_frame, text="源起始:", font=("Microsoft YaHei", 10)).pack(side=LEFT, padx=(0, 5))
             src_val = ", ".join(mapping.copy_rule.source_start) if isinstance(mapping.copy_rule.source_start, list) else mapping.copy_rule.source_start
-            src_text = scrolledtext.ScrolledText(row2_frame, width=35, height=3, wrap=tk.WORD)
+            # 增大文本框
+            src_text = scrolledtext.ScrolledText(row2_frame, width=50, height=4, wrap=tk.WORD, font=("Consolas", 10))
             src_text.insert("1.0", src_val)
-            src_text.pack(side=LEFT, padx=2, fill=X, expand=True)
+            src_text.pack(side=LEFT, padx=5, fill=X, expand=True)
             mv["source_start"] = src_text
 
-            ttk.Label(row2_frame, text="目标起始:").pack(side=LEFT, padx=(10, 2))
+            ttk.Label(row2_frame, text="目标起始:", font=("Microsoft YaHei", 10)).pack(side=LEFT, padx=(15, 5))
             tgt_val = ", ".join(mapping.copy_rule.target_start) if isinstance(mapping.copy_rule.target_start, list) else mapping.copy_rule.target_start
-            tgt_text = scrolledtext.ScrolledText(row2_frame, width=35, height=3, wrap=tk.WORD)
+            tgt_text = scrolledtext.ScrolledText(row2_frame, width=50, height=4, wrap=tk.WORD, font=("Consolas", 10))
             tgt_text.insert("1.0", tgt_val)
-            tgt_text.pack(side=LEFT, padx=2, fill=X, expand=True)
+            tgt_text.pack(side=LEFT, padx=5, fill=X, expand=True)
             mv["target_start"] = tgt_text
 
             # 行3: 方向和长度
             row3_frame = ttk.Frame(mf)
-            row3_frame.pack(fill=X, pady=2)
+            row3_frame.pack(fill=X, pady=5)
 
-            ttk.Label(row3_frame, text="方向:").pack(side=LEFT, padx=(0, 2))
+            ttk.Label(row3_frame, text="方向:", font=("Microsoft YaHei", 10)).pack(side=LEFT, padx=(0, 5))
             mv["direction"] = tk.StringVar(value=mapping.copy_rule.direction.value)
-            ttk.Combobox(row3_frame, values=["horizontal", "vertical"], textvariable=mv["direction"], width=12, state="readonly").pack(side=LEFT, padx=2)
+            ttk.Combobox(row3_frame, values=["horizontal", "vertical"], textvariable=mv["direction"], width=15, state="readonly", font=("Microsoft YaHei", 10)).pack(side=LEFT, padx=5)
 
-            ttk.Label(row3_frame, text="长度:").pack(side=LEFT, padx=(10, 2))
+            ttk.Label(row3_frame, text="长度:", font=("Microsoft YaHei", 10)).pack(side=LEFT, padx=(15, 5))
             mv["length"] = tk.IntVar(value=mapping.copy_rule.length)
-            ttk.Entry(row3_frame, textvariable=mv["length"], width=10).pack(side=LEFT, padx=2)
+            ttk.Entry(row3_frame, textvariable=mv["length"], width=12, font=("Microsoft YaHei", 10)).pack(side=LEFT, padx=5)
 
             return mv
 
@@ -895,16 +901,16 @@ class ExcelMigratorApp:
             canvas.yview_moveto(1.0)
 
         add_btn_frame = ttk.Frame(mappings_frame)
-        add_btn_frame.pack(fill=X, pady=5)
+        add_btn_frame.pack(fill=X, pady=10)
 
-        ttk.Button(add_btn_frame, text="➕ 添加映射", command=add_new_mapping, bootstyle="success").pack(side=LEFT, padx=5)
+        ttk.Button(add_btn_frame, text="➕ 添加映射", command=add_new_mapping, bootstyle="success", font=("Microsoft YaHei", 11)).pack(side=LEFT, padx=10)
 
         canvas.pack(side=LEFT, fill=BOTH, expand=True)
         scrollbar.pack(side=RIGHT, fill=Y)
 
-        # 底部按钮
+        # 底部按钮 - 放在主窗口底部，确保可见
         btn_frame = ttk.Frame(dialog)
-        btn_frame.pack(fill=X, pady=10)
+        btn_frame.pack(fill=X, pady=15)
 
         def do_save():
             sheet_mappings = []
@@ -957,6 +963,22 @@ class ExcelMigratorApp:
             messagebox.showinfo("成功", "保存成功")
             dialog.destroy()
             self._refresh_mapping_list(self._find_list_frame("mapping"))
+
+        # 放大按钮和保存/取消按钮放在同一行
+        toggle_btn2 = ttk.Button(btn_frame, text="🔍 缩小", command=toggle_expand, bootstyle="info", font=("Microsoft YaHei", 11))
+        toggle_btn2.pack(side=LEFT, padx=10)
+
+        ttk.Button(btn_frame, text="💾 保存", bootstyle="success", command=do_save, font=("Microsoft YaHei", 11)).pack(side=RIGHT, padx=10)
+        ttk.Button(btn_frame, text="取消", command=dialog.destroy, font=("Microsoft YaHei", 11)).pack(side=RIGHT, padx=10)
+
+        # 窗口关闭时解绑鼠标滚轮事件
+        def on_dialog_close():
+            try:
+                canvas.unbind_all("<MouseWheel>")
+            except:
+                pass
+            dialog.destroy()
+        dialog.protocol("WM_DELETE_WINDOW", on_dialog_close)
 
         ttk.Button(btn_frame, text="💾 保存", bootstyle="success", command=do_save).pack(side=LEFT, padx=5)
         ttk.Button(btn_frame, text="取消", command=dialog.destroy).pack(side=LEFT)
