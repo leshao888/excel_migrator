@@ -192,9 +192,9 @@ class ExcelMigratorApp:
             ttk.Label(parent_frame, text="暂无已保存的数据源，请点击上方按钮导入", bootstyle="info").pack()
             return
 
-        # 创建表格
+        # 创建表格（支持多选）
         columns = ("name", "path", "sheets", "status")
-        tree = ttk.Treeview(parent_frame, columns=columns, show="headings", height=12)
+        tree = ttk.Treeview(parent_frame, columns=columns, show="headings", height=12, selectmode="extended")
 
         tree.heading("name", text="名称")
         tree.heading("path", text="文件路径")
@@ -216,15 +216,28 @@ class ExcelMigratorApp:
         btn_frame = ttk.Frame(parent_frame)
         btn_frame.pack(fill=X, pady=5)
 
-        def on_delete():
+        def on_delete_selected():
             selected = tree.selection()
-            if selected:
-                ds_id = tree.item(selected[0])["tags"][0]
-                if messagebox.askyesno("确认", "确定要删除这个数据源吗？"):
+            if not selected:
+                messagebox.showwarning("提示", "请先选择要删除的数据源")
+                return
+            ids = [tree.item(item)["tags"][0] for item in selected]
+            names = [tree.item(item)["values"][0] for item in selected]
+            if messagebox.askyesno("确认", f"确定要删除选中的 {len(ids)} 个数据源吗？\n\n{names}"):
+                for ds_id in ids:
                     self.store.delete_data_source(ds_id)
-                    self._refresh_datasource_list(parent_frame)
+                self._refresh_datasource_list(parent_frame)
 
-        ttk.Button(btn_frame, text="🗑️ 删除", bootstyle="danger", command=on_delete).pack(side=LEFT, padx=5)
+        def on_delete_all():
+            if not data_sources:
+                return
+            if messagebox.askyesno("确认", f"确定要删除全部 {len(data_sources)} 个数据源吗？"):
+                for ds in data_sources:
+                    self.store.delete_data_source(ds.id)
+                self._refresh_datasource_list(parent_frame)
+
+        ttk.Button(btn_frame, text="🗑️ 删除选中", bootstyle="danger", command=on_delete_selected).pack(side=LEFT, padx=5)
+        ttk.Button(btn_frame, text="🗑️ 删除全部", bootstyle="danger", command=on_delete_all).pack(side=LEFT, padx=5)
 
     def _find_list_frame(self, page):
         """找到指定页面的列表frame（递归查找）"""
@@ -325,7 +338,7 @@ class ExcelMigratorApp:
             return
 
         columns = ("name", "path", "sheets", "status")
-        tree = ttk.Treeview(parent_frame, columns=columns, show="headings", height=12)
+        tree = ttk.Treeview(parent_frame, columns=columns, show="headings", height=12, selectmode="extended")
 
         tree.heading("name", text="名称")
         tree.heading("path", text="文件路径")
@@ -346,15 +359,28 @@ class ExcelMigratorApp:
         btn_frame = ttk.Frame(parent_frame)
         btn_frame.pack(fill=X, pady=5)
 
-        def on_delete():
+        def on_delete_selected():
             selected = tree.selection()
-            if selected:
-                t_id = tree.item(selected[0])["tags"][0]
-                if messagebox.askyesno("确认", "确定要删除这个模板吗？"):
+            if not selected:
+                messagebox.showwarning("提示", "请先选择要删除的模板")
+                return
+            ids = [tree.item(item)["tags"][0] for item in selected]
+            names = [tree.item(item)["values"][0] for item in selected]
+            if messagebox.askyesno("确认", f"确定要删除选中的 {len(ids)} 个模板吗？\n\n{names}"):
+                for t_id in ids:
                     self.store.delete_template(t_id)
-                    self._refresh_template_list(parent_frame)
+                self._refresh_template_list(parent_frame)
 
-        ttk.Button(btn_frame, text="🗑️ 删除", bootstyle="danger", command=on_delete).pack(side=LEFT, padx=5)
+        def on_delete_all():
+            if not templates:
+                return
+            if messagebox.askyesno("确认", f"确定要删除全部 {len(templates)} 个模板吗？"):
+                for t in templates:
+                    self.store.delete_template(t.id)
+                self._refresh_template_list(parent_frame)
+
+        ttk.Button(btn_frame, text="🗑️ 删除选中", bootstyle="danger", command=on_delete_selected).pack(side=LEFT, padx=5)
+        ttk.Button(btn_frame, text="🗑️ 删除全部", bootstyle="danger", command=on_delete_all).pack(side=LEFT, padx=5)
 
     # ==================== 映射配置页面 ====================
 
@@ -423,9 +449,6 @@ class ExcelMigratorApp:
         self.btn_edit_mapping = ttk.Button(edit_btn_frame, text="✏️ 编辑选中配置",
                                             command=self._edit_selected_mapping, state="disabled")
         self.btn_edit_mapping.pack(side=LEFT, padx=5)
-
-        ttk.Button(edit_btn_frame, text="🗑️ 删除选中配置", bootstyle="danger",
-                   command=self._delete_selected_mapping).pack(side=LEFT, padx=5)
 
         # 左侧：列表
         left_frame = ttk.LabelFrame(content_frame, text="已有映射配置")
@@ -504,7 +527,7 @@ class ExcelMigratorApp:
             return
 
         columns = ("name", "mappings", "updated")
-        tree = ttk.Treeview(parent_frame, columns=columns, show="headings", height=15)
+        tree = ttk.Treeview(parent_frame, columns=columns, show="headings", height=15, selectmode="extended")
 
         tree.heading("name", text="配置名称")
         tree.heading("mappings", text="映射数")
@@ -527,6 +550,8 @@ class ExcelMigratorApp:
                 if config_item:
                     self._show_mapping_detail(config_item)
                     self.btn_edit_mapping.config(state="normal")
+            else:
+                self.btn_edit_mapping.config(state="disabled")
 
         tree.bind("<<TreeviewSelect>>", on_select)
 
@@ -537,6 +562,44 @@ class ExcelMigratorApp:
             if config_item:
                 self._show_mapping_detail(config_item)
                 self.btn_edit_mapping.config(state="normal")
+
+        # 按钮
+        btn_frame = ttk.Frame(parent_frame)
+        btn_frame.pack(fill=X, pady=5)
+
+        def on_delete_selected():
+            selected = tree.selection()
+            if not selected:
+                messagebox.showwarning("提示", "请先选择要删除的映射配置")
+                return
+            ids = [tree.item(item)["tags"][0] for item in selected]
+            names = [tree.item(item)["values"][0] for item in selected]
+            if messagebox.askyesno("确认", f"确定要删除选中的 {len(ids)} 个映射配置吗？\n\n{names}"):
+                for config_id in ids:
+                    self.store.delete_mapping_config(config_id)
+                # 清空详情
+                self.detail_text.config(state="normal")
+                self.detail_text.delete("1.0", END)
+                self.detail_text.insert(END, "已删除，请选择其他配置")
+                self.detail_text.config(state="disabled")
+                self.btn_edit_mapping.config(state="disabled")
+                self._refresh_mapping_list(parent_frame)
+
+        def on_delete_all():
+            if not configs:
+                return
+            if messagebox.askyesno("确认", f"确定要删除全部 {len(configs)} 个映射配置吗？"):
+                for c in configs:
+                    self.store.delete_mapping_config(c.id)
+                self.detail_text.config(state="normal")
+                self.detail_text.delete("1.0", END)
+                self.detail_text.insert(END, "已全部删除")
+                self.detail_text.config(state="disabled")
+                self.btn_edit_mapping.config(state="disabled")
+                self._refresh_mapping_list(parent_frame)
+
+        ttk.Button(btn_frame, text="🗑️ 删除选中", bootstyle="danger", command=on_delete_selected).pack(side=LEFT, padx=5)
+        ttk.Button(btn_frame, text="🗑️ 删除全部", bootstyle="danger", command=on_delete_all).pack(side=LEFT, padx=5)
 
     def _show_mapping_detail(self, config_item):
         """显示映射配置详情"""
