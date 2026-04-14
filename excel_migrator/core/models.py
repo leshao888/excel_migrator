@@ -113,7 +113,7 @@ class SheetMapping:
 @dataclass
 class MappingConfig:
     """完整映射配置"""
-    version: str = "1.0"
+    version: str = "1.2"  # 使用与程序版本对应的配置版本
     default_direction: Direction = Direction.HORIZONTAL
     write_mode: WriteMode = WriteMode.SKIP_NONEMPTY  # 写入模式：skip_nonempty 或 overwrite
     sheet_mappings: list[SheetMapping] = field(default_factory=list)

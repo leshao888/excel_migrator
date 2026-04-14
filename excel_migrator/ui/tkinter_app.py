@@ -11,7 +11,7 @@ from ttkbootstrap.constants import *
 import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext
 
-from config import STORAGE_DIR, DATA_SOURCES_FILE, TEMPLATES_FILE, MAPPING_CONFIGS_FILE, EXAMPLE_MAPPING_FILENAME, DEFAULT_DIRECTION, DEFAULT_WRITE_MODE
+from config import STORAGE_DIR, DATA_SOURCES_FILE, TEMPLATES_FILE, MAPPING_CONFIGS_FILE, EXAMPLE_MAPPING_FILENAME, CONFIG_VERSION, DEFAULT_DIRECTION, DEFAULT_WRITE_MODE
 from storage.store import StorageManager
 from core.models import DataSourceItem, TemplateItem, MappingConfigItem, MappingConfig, SheetMapping, CopyRule, CopyResult
 from core.enums import Direction, WriteMode, normalize_string, normalize_list_string, validate_cell_references, get_supported_separators_display
@@ -398,9 +398,9 @@ class ExcelMigratorApp:
         # 下载示例
         def download_example():
             example_config = {
-                "version": "1.0",
+                "version": CONFIG_VERSION,
                 "default_direction": DEFAULT_DIRECTION,
-                "default_write_mode": DEFAULT_WRITE_MODE.value,
+                "write_mode": DEFAULT_WRITE_MODE.value,
                 "sheet_mappings": [
                     {
                         "data_source_sheet": "数据源Sheet名称",
@@ -957,7 +957,7 @@ class ExcelMigratorApp:
             write_mode = normalize_string(write_mode_var.get())
 
             new_config = MappingConfig.from_dict({
-                "version": "1.0",
+                "version": CONFIG_VERSION,
                 "default_direction": config_item.config.default_direction.value,
                 "write_mode": write_mode,
                 "sheet_mappings": sheet_mappings
