@@ -479,8 +479,14 @@ class ExcelMigratorApp:
                 with open(path, "r", encoding="utf-8") as f:
                     config_data = json.load(f)
 
+                # 更新配置版本为当前版本，确保格式一致
+                config_data["version"] = CONFIG_VERSION
                 config = MappingConfig.from_dict(config_data)
                 name = os.path.basename(path).replace(".json", "")
+
+                # 同时更新原文件，保存为新版本格式
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump(config.to_dict(), f, ensure_ascii=False, indent=2)
 
                 # 检查是否已存在同名配置
                 existing_configs = self.store.load_mapping_configs()
