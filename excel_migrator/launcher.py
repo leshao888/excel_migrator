@@ -17,7 +17,7 @@ def main():
         sys.path.insert(0, base_dir)
 
     print("=" * 50)
-    print("Excel 数据迁移工具 v1.0")
+    print("Excel 数据迁移工具 v1.3")
     print("=" * 50)
     print()
 

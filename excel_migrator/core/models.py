@@ -72,10 +72,11 @@ class CopyRule:
 @dataclass
 class SheetMapping:
     """Sheet 映射配置"""
+    data_source: str   # 数据源文件名称
     data_source_sheet: str   # 数据源的 sheet 名称
     template_file: str        # 目标模板文件名称
     template_sheet: str = ""  # 目标模板的 sheet 名称（可选，默认使用第一个）
-    copy_rule: CopyRule = None  # 修复：添加默认值
+    copy_rule: CopyRule = None
 
     def __post_init__(self):
         if self.copy_rule is None:
@@ -89,10 +90,12 @@ class SheetMapping:
     @classmethod
     def from_dict(cls, data: dict) -> "SheetMapping":
         # 兼容旧字段名
+        source = data.get("data_source") or ""
         source_sheet = data.get("data_source_sheet") or data.get("source_sheet", "")
         target = data.get("template_file") or data.get("target_sheet", "")
-        tmpl_sheet = data.get("template_sheet", "")  # 兼容旧版本
+        tmpl_sheet = data.get("template_sheet", "")
         return cls(
+            data_source=source,
             data_source_sheet=source_sheet,
             template_file=target,
             template_sheet=tmpl_sheet,
@@ -101,6 +104,7 @@ class SheetMapping:
 
     def to_dict(self) -> dict:
         result = {
+            "data_source": self.data_source,
             "data_source_sheet": self.data_source_sheet,
             "template_file": self.template_file,
             "copy_rule": self.copy_rule.to_dict()
@@ -113,7 +117,7 @@ class SheetMapping:
 @dataclass
 class MappingConfig:
     """完整映射配置"""
-    version: str = "1.2"  # 使用与程序版本对应的配置版本
+    version: str = "1.3"  # 使用与程序版本对应的配置版本
     default_direction: Direction = Direction.HORIZONTAL
     write_mode: WriteMode = WriteMode.SKIP_NONEMPTY  # 写入模式：skip_nonempty 或 overwrite
     sheet_mappings: list[SheetMapping] = field(default_factory=list)

@@ -29,7 +29,7 @@ def main():
     )
 
     st.sidebar.divider()
-    st.sidebar.markdown("**Excel 数据迁移工具 v1.0**")
+    st.sidebar.markdown("**Excel 数据迁移工具 v1.3**")
 
     # 渲染页面
     if page == "数据源管理":

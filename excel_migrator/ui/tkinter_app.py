@@ -29,7 +29,7 @@ class ExcelMigratorApp:
 
         # 创建主窗口
         self.root = ttk.Window(themename="cosmo")
-        self.root.title("Excel 数据迁移工具 v1.2")
+        self.root.title("Excel 数据迁移工具 v1.3")
         self.root.geometry("1100x750")
         self.root.minsize(900, 600)
 
@@ -87,7 +87,7 @@ class ExcelMigratorApp:
             self.nav_buttons[page_key] = btn
 
         # 版本信息
-        version_label = ttk.Label(sidebar, text="v1.2", bootstyle="secondary")
+        version_label = ttk.Label(sidebar, text="v1.3", bootstyle="secondary")
         version_label.pack(side=BOTTOM, pady=10)
 
     def _show_page(self, page_key: str):
@@ -110,7 +110,7 @@ class ExcelMigratorApp:
         self.current_page.pack(side=RIGHT, fill=BOTH, expand=True, padx=10, pady=10)
 
     def _show_about(self):
-        messagebox.showinfo("关于", "Excel 数据迁移工具 v1.2\n\n用于 Excel 数据迁移的工具软件")
+        messagebox.showinfo("关于", "Excel 数据迁移工具 v1.3\n\n用于 Excel 数据迁移的工具软件")
 
     # ==================== 数据源管理页面 ====================
 
@@ -403,6 +403,7 @@ class ExcelMigratorApp:
                 "write_mode": DEFAULT_WRITE_MODE.value,
                 "sheet_mappings": [
                     {
+                        "data_source": "数据源文件.xlsx",
                         "data_source_sheet": "数据源Sheet名称",
                         "template_file": "模板文件名.xlsx",
                         "template_sheet": "模板Sheet名称",
@@ -484,20 +485,12 @@ class ExcelMigratorApp:
                 config = MappingConfig.from_dict(config_data)
                 name = os.path.basename(path).replace(".json", "")
 
-                # 构建完整的配置项数据，包括源文件路径
-                full_data = config.to_dict()
-                full_data["source_file_path"] = path  # 记录源文件路径
-
-                # 同时更新原文件，保存为新版本格式（包含source_file_path）
-                with open(path, "w", encoding="utf-8") as f:
-                    json.dump(full_data, f, ensure_ascii=False, indent=2)
-
                 # 检查是否已存在同名配置
                 existing_configs = self.store.load_mapping_configs()
                 existing = next((c for c in existing_configs if c.name == name), None)
 
                 if existing:
-                    # 覆盖更新，保留原 id 和创建时间，同时更新源文件路径
+                    # 覆盖更新，保留原 id 和创建时间
                     item = MappingConfigItem(
                         id=existing.id,
                         name=name,
@@ -509,7 +502,7 @@ class ExcelMigratorApp:
                     self.store.update_mapping_config(item)
                     overwrite_count += 1
                 else:
-                    # 新建，使用新 id，记录源文件路径
+                    # 新建，使用新 id
                     item = MappingConfigItem.create(name=name, config=config, source_file_path=path)
                     self.store.save_mapping_config(item)
                     success_count += 1
@@ -745,7 +738,17 @@ class ExcelMigratorApp:
         templates = self.store.load_templates()
 
         # 找到当前映射对应的数据源
-        def find_ds_by_sheet(sheet_name):
+        def find_ds_by_sheet(sheet_name, ds_file_name=""):
+            # 优先通过 data_source 文件名匹配
+            if ds_file_name:
+                for ds in data_sources:
+                    ds_basename = os.path.basename(ds.file_path)
+                    # 比较：直接匹配、去掉扩展名匹配、包含匹配
+                    if ds_file_name == ds.name or ds_file_name == ds_basename or \
+                       ds_file_name == os.path.splitext(ds.name)[0] or \
+                       ds_basename.startswith(ds_file_name.rsplit('.', 1)[0] if '.' in ds_file_name else ds_file_name):
+                        return ds
+            # 其次通过 sheet 名称匹配
             for ds in data_sources:
                 if sheet_name in ds.sheets:
                     return ds
@@ -768,6 +771,7 @@ class ExcelMigratorApp:
             # 如果没有传入mapping，使用默认值
             if mapping is None:
                 mapping = type('Mapping', (), {
+                    'data_source': '',
                     'data_source_sheet': '',
                     'template_file': templates[0].name if templates else '',
                     'template_sheet': '',
@@ -779,7 +783,7 @@ class ExcelMigratorApp:
                     })()
                 })()
 
-            current_ds = find_ds_by_sheet(mapping.data_source_sheet)
+            current_ds = find_ds_by_sheet(mapping.data_source_sheet, mapping.data_source)
             current_tmpl = find_tmpl_by_file(mapping.template_file)
 
             # 删除按钮
@@ -889,14 +893,21 @@ class ExcelMigratorApp:
 
             ttk.Label(row3_frame, text="方向:", font=("Microsoft YaHei", 10)).grid(row=0, column=0, sticky=W, padx=(5, 2))
             # 处理direction可能是字符串或Direction枚举的情况
-            dir_value = mapping.copy_rule.direction.value if hasattr(mapping.copy_rule.direction, 'value') else mapping.copy_rule.direction
-            mv["direction"] = tk.StringVar(value=dir_value)
+            dir_value = mapping.copy_rule.direction
+            if hasattr(dir_value, 'value'):
+                dir_value = dir_value.value
+            mv["direction"] = tk.StringVar(value=str(dir_value))
             dir_combo = ttk.Combobox(row3_frame, values=["horizontal", "vertical"], textvariable=mv["direction"], width=15, state="readonly", font=("Microsoft YaHei", 10))
             dir_combo.grid(row=0, column=1, sticky=W, padx=5)
             dir_combo.bind("<MouseWheel>", stop_propagation)
 
             ttk.Label(row3_frame, text="长度:", font=("Microsoft YaHei", 10)).grid(row=0, column=2, sticky=W, padx=(10, 2))
-            mv["length"] = tk.IntVar(value=mapping.copy_rule.length)
+            # 确保length是整数
+            try:
+                length_val = int(mapping.copy_rule.length)
+            except (ValueError, TypeError):
+                length_val = 10
+            mv["length"] = tk.IntVar(value=length_val)
             ttk.Entry(row3_frame, textvariable=mv["length"], width=12, font=("Microsoft YaHei", 10)).grid(row=0, column=3, sticky=W, padx=5)
 
             return mv
@@ -905,6 +916,10 @@ class ExcelMigratorApp:
         for i, mapping in enumerate(config_item.config.sheet_mappings):
             mv = create_mapping_frame(scrollable, i, mapping)
             mapping_vars.append(mv)
+
+        # 确保canvas滚动区域已更新
+        dialog.update_idletasks()
+        canvas.configure(scrollregion=canvas.bbox("all"))
 
         # 新增映射按钮
         def add_new_mapping():
@@ -953,6 +968,7 @@ class ExcelMigratorApp:
                     return
 
                 sheet_mappings.append({
+                    "data_source": mv["ds"].get(),
                     "data_source_sheet": mv["ds_sheet"].get(),
                     "template_file": mv["template"].get(),
                     "template_sheet": mv["template_sheet"].get(),
@@ -991,8 +1007,10 @@ class ExcelMigratorApp:
                 print(f"[DEBUG] source_file_path = {source_path}")
                 print(f"[DEBUG] file exists = {os.path.exists(source_path)}")
                 try:
+                    # 构建完整的配置数据（不包含source_file_path，保持格式干净）
+                    full_data = new_config.to_dict()
                     with open(source_path, "w", encoding="utf-8") as f:
-                        json.dump(new_config.to_dict(), f, ensure_ascii=False, indent=2)
+                        json.dump(full_data, f, ensure_ascii=False, indent=2)
                     print(f"[DEBUG] file written successfully")
                     messagebox.showinfo("成功", f"保存成功\n\n配置文件已更新:\n{source_path}")
                 except Exception as e:
@@ -1171,7 +1189,54 @@ class ExcelMigratorApp:
         btn_frame = ttk.Frame(frame)
         btn_frame.pack(fill=X, pady=5)
 
-        def execute():
+        def build_preview_message():
+            """构建预览消息，用于确认对话框"""
+            cfg = next((c for c in configs if c.name == cfg_var.get()), None)
+            if not cfg:
+                return "请选择映射配置"
+
+            # 自动匹配数据源和模板
+            ds_sheet_to_ds = {}
+            for ds in data_sources:
+                for sheet in ds.sheets:
+                    ds_sheet_to_ds[sheet] = ds
+
+            template_name_map = {os.path.basename(t.file_path): t for t in templates}
+
+            # 按模板文件分组映射
+            template_groups = {}
+            for m in cfg.config.sheet_mappings:
+                ds = ds_sheet_to_ds.get(m.data_source_sheet)
+                t_item = template_name_map.get(m.template_file)
+                if not ds or not t_item:
+                    continue
+                if m.template_file not in template_groups:
+                    template_groups[m.template_file] = {"ds": ds, "t_item": t_item, "mappings": []}
+                template_groups[m.template_file]["mappings"].append(m)
+
+            if not template_groups:
+                return "❌ 无法匹配任何有效的数据源和模板组合\n请确保数据源和模板已正确导入"
+
+            lines = ["📋 迁移预览：\n", "="*40]
+            for t_file, group in template_groups.items():
+                ds = group["ds"]
+                mappings = group["mappings"]
+                lines.append(f"\n📁 模板文件: {t_file}")
+                lines.append(f"📊 数据源: {ds.name}")
+                for m in mappings:
+                    r = m.copy_rule
+                    tmpl_sheet = m.template_sheet if m.template_sheet else "默认"
+                    src_cells = r.source_start if isinstance(r.source_start, str) else ", ".join(r.source_start)
+                    tgt_cells = r.target_start if isinstance(r.target_start, str) else ", ".join(r.target_start)
+                    lines.append(f"   • {m.data_source_sheet} [{src_cells}] → {tmpl_sheet} [{tgt_cells}]")
+                    lines.append(f"     方向: {r.direction.value}, 长度: {r.length}")
+
+            lines.append("\n" + "="*40)
+            lines.append(f"\n共 {sum(len(g['mappings']) for g in template_groups.values())} 个迁移任务")
+            return "\n".join(lines)
+
+        def do_migration():
+            """执行迁移"""
             result_text.config(state="normal")
             result_text.delete("1.0", END)
             result_text.update()
@@ -1303,7 +1368,14 @@ class ExcelMigratorApp:
                 messagebox.showerror("迁移失败", f"❌ 迁移失败: {str(e)}")
                 result_text.config(state="disabled")
 
-        ttk.Button(btn_frame, text="🚀 执行迁移", bootstyle="success", command=execute).pack(side=LEFT, padx=5)
+        def execute_with_preview():
+            """显示预览确认对话框，确认后执行迁移"""
+            preview_msg = build_preview_message()
+            response = messagebox.askyesno("确认执行迁移", preview_msg + "\n\n是否确认执行迁移？")
+            if response:
+                do_migration()
+
+        ttk.Button(btn_frame, text="🚀 执行迁移", bootstyle="success", command=execute_with_preview).pack(side=LEFT, padx=5)
 
         update_preview()
 

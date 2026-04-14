@@ -16,7 +16,7 @@ TEMPLATES_FILE = STORAGE_DIR / "templates.json"
 MAPPING_CONFIGS_FILE = STORAGE_DIR / "mapping_configs.json"
 
 # 默认配置
-CONFIG_VERSION = "1.2"  # 配置版本，用于后续兼容性扩展
+CONFIG_VERSION = "1.3"  # 配置版本，用于后续兼容性扩展
 DEFAULT_DIRECTION = "horizontal"
 DEFAULT_WRITE_MODE = WriteMode.SKIP_NONEMPTY
 
