@@ -211,16 +211,18 @@ class MappingConfigItem:
     config: MappingConfig
     created_at: str
     updated_at: str
+    source_file_path: str = ""  # 原始配置文件路径，用于保存时回写
 
     @classmethod
-    def create(cls, name: str, config: MappingConfig) -> "MappingConfigItem":
+    def create(cls, name: str, config: MappingConfig, source_file_path: str = "") -> "MappingConfigItem":
         now = datetime.now().isoformat()
         return cls(
             id=str(uuid.uuid4()),
             name=name,
             config=config,
             created_at=now,
-            updated_at=now
+            updated_at=now,
+            source_file_path=source_file_path
         )
 
     def to_dict(self) -> dict:
@@ -229,7 +231,8 @@ class MappingConfigItem:
             "name": self.name,
             "config": self.config.to_dict(),
             "created_at": self.created_at,
-            "updated_at": self.updated_at
+            "updated_at": self.updated_at,
+            "source_file_path": self.source_file_path
         }
 
     @classmethod
@@ -239,7 +242,8 @@ class MappingConfigItem:
             name=data["name"],
             config=MappingConfig.from_dict(data["config"]),
             created_at=data["created_at"],
-            updated_at=data["updated_at"]
+            updated_at=data["updated_at"],
+            source_file_path=data.get("source_file_path", "")
         )
 
 

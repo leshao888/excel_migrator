@@ -484,28 +484,33 @@ class ExcelMigratorApp:
                 config = MappingConfig.from_dict(config_data)
                 name = os.path.basename(path).replace(".json", "")
 
-                # 同时更新原文件，保存为新版本格式
+                # 构建完整的配置项数据，包括源文件路径
+                full_data = config.to_dict()
+                full_data["source_file_path"] = path  # 记录源文件路径
+
+                # 同时更新原文件，保存为新版本格式（包含source_file_path）
                 with open(path, "w", encoding="utf-8") as f:
-                    json.dump(config.to_dict(), f, ensure_ascii=False, indent=2)
+                    json.dump(full_data, f, ensure_ascii=False, indent=2)
 
                 # 检查是否已存在同名配置
                 existing_configs = self.store.load_mapping_configs()
                 existing = next((c for c in existing_configs if c.name == name), None)
 
                 if existing:
-                    # 覆盖更新，保留原 id 和创建时间
+                    # 覆盖更新，保留原 id 和创建时间，同时更新源文件路径
                     item = MappingConfigItem(
                         id=existing.id,
                         name=name,
                         config=config,
                         created_at=existing.created_at,
-                        updated_at=datetime.now().isoformat()
+                        updated_at=datetime.now().isoformat(),
+                        source_file_path=path
                     )
                     self.store.update_mapping_config(item)
                     overwrite_count += 1
                 else:
-                    # 新建，使用新 id
-                    item = MappingConfigItem.create(name=name, config=config)
+                    # 新建，使用新 id，记录源文件路径
+                    item = MappingConfigItem.create(name=name, config=config, source_file_path=path)
                     self.store.save_mapping_config(item)
                     success_count += 1
 
@@ -974,11 +979,29 @@ class ExcelMigratorApp:
                 name=config_item.name,
                 config=new_config,
                 created_at=config_item.created_at,
-                updated_at=datetime.now().isoformat()
+                updated_at=datetime.now().isoformat(),
+                source_file_path=config_item.source_file_path
             )
 
             self.store.update_mapping_config(updated)
-            messagebox.showinfo("成功", "保存成功")
+
+            # 如果有源文件路径，同步更新原文件
+            source_path = config_item.source_file_path
+            if source_path:
+                print(f"[DEBUG] source_file_path = {source_path}")
+                print(f"[DEBUG] file exists = {os.path.exists(source_path)}")
+                try:
+                    with open(source_path, "w", encoding="utf-8") as f:
+                        json.dump(new_config.to_dict(), f, ensure_ascii=False, indent=2)
+                    print(f"[DEBUG] file written successfully")
+                    messagebox.showinfo("成功", f"保存成功\n\n配置文件已更新:\n{source_path}")
+                except Exception as e:
+                    print(f"[DEBUG] file write error: {e}")
+                    messagebox.showwarning("保存成功", f"但配置文件更新失败:\n{str(e)}")
+                    messagebox.showinfo("成功", "保存成功")
+            else:
+                print(f"[DEBUG] source_file_path is empty or None")
+                messagebox.showinfo("成功", "保存成功")
             dialog.destroy()
             self._refresh_mapping_list(self._find_list_frame("mapping"))
 
