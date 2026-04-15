@@ -20,6 +20,8 @@ hiddenimports = [
 
 datas = [
     (os.path.join(current_dir, 'config.py'), '.'),
+    (os.path.join(current_dir, 'launcher.py'), '.'),
+    (os.path.join(current_dir, 'updater.py'), '.'),
     (os.path.join(current_dir, 'gui.py'), '.'),
     (os.path.join(current_dir, 'MANUAL.md'), '.'),
     (os.path.join(current_dir, 'VERSION.md'), '.'),
@@ -31,7 +33,7 @@ for subdir in ['core', 'storage', 'ui', 'utils']:
         datas.append((src_dir, subdir))
 
 a = Analysis(
-    ['gui.py'],
+    ['launcher.py'],
     pathex=[current_dir],
     binaries=[],
     datas=datas,
